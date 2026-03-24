@@ -1,10 +1,11 @@
 from pathlib import Path
+
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from io import TextIOWrapper
 from typing import Any
 import re
-
+from datetime import datetime
 import pandas as pd
 
 
@@ -47,7 +48,7 @@ class SpecScan:
     metadata: dict[str, Any] = field(default_factory=dict)
     columns: list[str] = field(default_factory=list)
     data: list[list[float]] = field(default_factory=list)
-
+    time: datetime = field(default_factory=datetime.now)
     _raw_p_values: list[float] = field(default_factory=list, repr=False)
     _raw_uxml: list[str] = field(default_factory=list, repr=False)
     _uxml_dict: dict[str, Any] | None = field(default=None, repr=False, init=False)
@@ -78,6 +79,15 @@ class SpecScan:
         if not self.columns or not self.data:
             return pd.DataFrame()
         return pd.DataFrame(self.data, columns=self.columns)
+
+    @property
+    def sdd_from_uxml(self) -> float | None:
+        """UXML에서 sample_detector_distance를 직접 추출하는 헬퍼"""
+        try:
+            # ad_detector -> sample_detector_distance 경로 탐색
+            return float(self.uxml.get('ad_detector', {}).get('sample_detector_distance', None))
+        except (TypeError, ValueError):
+            return None
 
 
 class Spec:
@@ -120,7 +130,10 @@ class Spec:
                     tag = line.split(' ', 1)[0]
                     self.file_metadata[tag] = line[len(tag):].strip()
             else:
-                if line.startswith('#L '):
+                if line.startswith('#D '):
+                    # line[3:]을 통해 '#D '를 제거하고 파싱
+                    current_scan.time = datetime.strptime(line[3:], '%a %b %d %H:%M:%S %Y')
+                elif line.startswith('#L '):
                     current_scan.columns = line[3:].split()
                 elif line.startswith('#P') and line[2:3].isdigit():
                     current_scan._raw_p_values.extend([float(x) for x in line[line.find(' ')+1:].split()])
@@ -168,20 +181,19 @@ class Spec:
 
 
 if __name__ == '__main__':
-
     file = 'data/250626'
     with Spec(file) as spec:
-        scan1 = spec.get_scan(1)
+        scan = spec.get_scan(1)
+        
+        # 1. 헬퍼 프로퍼티 사용
+        sdd = scan.sdd_from_uxml
+        
+        # 2. 직접 딕셔너리 접근
+        # <ad_detector> 태그 아래 <sample_detector_distance>가 있는 구조
+        try:
+            raw_sdd = scan.uxml['ad_detector']['sample_detector_distance']
+        except KeyError:
+            raw_sdd = scan.motors.get('SDD', 0) # 모터에서 Fallback
 
-        if scan1 and scan1.uxml:
-            center_x = scan1.uxml['ad_center']['beam_center_x']
-            center_y = scan1.uxml['ad_center']['beam_center_y']
-            print(f"Beam Center: ({center_x}, {center_y})")
+        print(f"Distance (UXML): {sdd} mm")
 
-            df_rois = pd.DataFrame(scan1.uxml['ad_regions_of_interest']['roi'])
-            print("\n[ ROI DataFrame ]")
-            print(df_rois[['number', 'array_port', 'min_x', 'size_x', 'min_y', 'size_y']])
-
-            df_counters = pd.DataFrame(scan1.uxml['ad_counters']['counter'])
-            print("\n[ Counters DataFrame ]")
-            print(df_counters[['number', 'name', 'value_description']])
