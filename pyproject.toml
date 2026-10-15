@@ -1,7 +1,7 @@
 [project]
 name = "spec-manager"
 version = "0.1.0"
-description = "Add your description here"
+description = "Parser for SPEC scan files and plotting scripts for rocking curves and peak broadening"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
