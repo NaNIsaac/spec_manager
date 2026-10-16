@@ -1,5 +1,7 @@
 # spec_manager
 
+Merged into CXD (https://github.com/NaNIsaac/CXD); this repo is no longer maintained.
+
 Parser for SPEC (Certified Scientific Software) scan files, including `#O/#P` motor positions, `#D` timestamps and `#UXML` metadata, plus plotting scripts for rocking curves and peak broadening (FWHM vs Q) of SrTiO₃ films.
 
 SPEC 데이터 파일을 `Spec` / `SpecScan` 객체로 읽는 파서와, 이를 이용한 분석 스크립트. 개인 분석 코드. 같은 파서가 [CXD](https://github.com/NaNIsaac/CXD) 의 `cxd.core.spec` 으로 이어졌다.
