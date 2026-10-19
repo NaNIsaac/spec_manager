@@ -12,3 +12,9 @@ dependencies = [
 
 [tool.ruff]
 line-length = 100
+
+# violations present when ruff became mandatory in CI; remove entries as they are fixed
+[tool.ruff.lint.extend-per-file-ignores]
+"main.py" = ["I001"]
+"rocking_curve.py" = ["F841", "RUF059"]
+"spec.py" = ["I001"]
