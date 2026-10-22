@@ -150,44 +150,22 @@ class Spec:
                     except ValueError:
                         pass
     
-    def _parse_file_header(self, line: str):
-        tag = line.split(' ', 1)[0]
-        val = line[len(tag):].strip()
-        
-        if tag.startswith('#O') and tag[2:].isdigit():
-            self.motor_names.extend(val.split())
-        self.file_metadata[tag] = val
-
-    def _parse_scan_header(self, scan: SpecScan, line: str):
-        tag = line.split(' ', 1)[0]
-        val = line[len(tag):].strip()
-
-        if tag == '#L':
-            scan.columns = val.split()
-        elif tag.startswith('#P') and tag[2:].isdigit():
-            scan._raw_p_values.extend(float(x) for x in val.split())
-        else:
-            scan.metadata[tag] = val
-
-    def _parse_data_row(self, scan: SpecScan, line: str):
-        try:
-            scan.data.append([float(x) for x in line.split()])
-        except ValueError:
-            pass
-    
     def get_scan(self, scan_no: int) -> SpecScan:
         return self.scans[scan_no]
 
 
 
 if __name__ == '__main__':
-    file = 'data/250626'
-    with Spec(file) as spec:
+    import sys
+
+    if len(sys.argv) != 2:
+        sys.exit("usage: python spec.py SPEC_FILE")
+    with Spec(sys.argv[1]) as spec:
         scan = spec.get_scan(1)
-        
+
         # 1. 헬퍼 프로퍼티 사용
         sdd = scan.sdd_from_uxml
-        
+
         # 2. 직접 딕셔너리 접근
         # <ad_detector> 태그 아래 <sample_detector_distance>가 있는 구조
         try:
@@ -196,4 +174,3 @@ if __name__ == '__main__':
             raw_sdd = scan.motors.get('SDD', 0) # 모터에서 Fallback
 
         print(f"Distance (UXML): {sdd} mm")
-

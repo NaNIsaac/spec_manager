@@ -13,7 +13,7 @@ Python 3.13+, pandas, scipy, matplotlib.
 ```python
 from spec import Spec
 
-with Spec("data/250626") as spec:
+with Spec("path/to/file.spec") as spec:
     scan = spec.get_scan(1)
     scan.command, scan.time, scan.motors["Delta"]
     df = scan.to_dataframe()         # #L 열 이름 그대로
@@ -22,11 +22,26 @@ with Spec("data/250626") as spec:
 
 ```powershell
 uv sync
-uv run rocking_curve.py   # data/250626 의 scan 1104, 879 rocking curve (imroi1, 정규화, log)
-uv run main.py            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
+uv run rocking_curve.py PATH_TO_SPEC   # 그 파일의 scan 1104, 879 rocking curve (imroi1, 정규화, log)
+uv run main.py PATH_TO_SPEC            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
 ```
 
-두 스크립트는 저장소 루트에서 실행한다. 에너지 · 오프셋 · 시료 라벨은 `main.py` 에 하드코딩되어 있다. `data/data*.csv` 는 헤더 없는 `scan, gamma, delta, theta` 4열.
+두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)은 저장소에 없다: scan 번호와 `data/data*.csv` 는 그 파일에 묶여 있어서, 다른 SPEC 파일로는 스크립트가 해당 scan 을 찾지 못한다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다.
+
+```powershell
+uv run tests/synthetic_spec.py out.spec 1104 879   # 측정값이 아닌 생성 데이터, scan 1104 와 879 만
+uv run rocking_curve.py out.spec
+```
+
+ 에너지 · 오프셋 · 시료 라벨은 `main.py` 에 하드코딩되어 있다. `data/data*.csv` 는 헤더 없는 `scan, gamma, delta, theta` 4열.
+
+## Test
+
+```powershell
+uv run --with pytest pytest
+```
+
+파서(필드, UXML 중첩·형 변환, 중복·잘못된 줄·없는 scan), Gaussian FWHM 적합, Q 계산(λ = 1 Å 에서 2θ = 60° 의 4π sin θ / λ), 두 스크립트의 실행을 생성 데이터로 확인한다. 실측 데이터로 얻은 결과를 확인하는 시험은 아니다.
 
 ## Structure
 
@@ -34,7 +49,8 @@ uv run main.py            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, 
 spec.py            Spec, SpecScan 파서
 rocking_curve.py   rocking curve 비교 그림
 main.py            FWHM vs Q
-data/              예제 SPEC 파일(250626, 3753 scans)과 scan 목록 CSV
+data/              scan 목록 CSV (실측 SPEC 파일의 scan 번호, SPEC 파일 자체는 없음)
+tests/             생성 데이터 기반 pytest 와 생성기(synthetic_spec.py)
 ```
 
 ## Where the same code lives now

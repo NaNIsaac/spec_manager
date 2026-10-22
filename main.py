@@ -1,3 +1,6 @@
+import argparse
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -44,8 +47,7 @@ def fit_gaussian_fwhm(x, y):
     return 2.3548 * abs(popt[2])
 
 
-def main():
-    file = 'data/250626'
+def main(file: Path):
     energy_val = 5550
     # 제공해주신 오프셋 값
     GAMMA_OFF = 1.4367
@@ -95,4 +97,6 @@ def main():
     plt.show()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Gaussian FWHM vs Q from a SPEC file and data/data*.csv')
+    parser.add_argument('spec_file', type=Path, help='SPEC file the scan numbers in data/data*.csv refer to')
+    main(parser.parse_args().spec_file)

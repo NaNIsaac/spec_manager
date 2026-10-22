@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -18,8 +19,7 @@ def load_scan_nums():
         scan_nums.extend(df.iloc[:, 0].to_list())
     return scan_nums
 
-def main() -> None:
-    file: Path = Path('data/250626')
+def main(file: Path) -> None:
     print(f"Load spec file: '{file}'")
 
     plot_config = {
@@ -88,4 +88,6 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Rocking curves of scans 1104 and 879 from a SPEC file')
+    parser.add_argument('spec_file', type=Path, help='SPEC file that holds those scans')
+    main(parser.parse_args().spec_file)
