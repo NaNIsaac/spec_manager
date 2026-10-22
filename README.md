@@ -26,10 +26,11 @@ uv run rocking_curve.py PATH_TO_SPEC   # 그 파일의 scan 1104, 879 rocking cu
 uv run main.py PATH_TO_SPEC            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
 ```
 
-두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)은 저장소에 없다: scan 번호와 `data/data*.csv` 는 그 파일에 묶여 있어서, 다른 SPEC 파일로는 스크립트가 해당 scan 을 찾지 못한다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다.
+두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)과 그 scan 목록 CSV 는 저장소에 없다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다. `data/data*.csv` 는 git 이 무시하므로 자기 scan 목록을 둬도 커밋되지 않는다.
 
 ```powershell
-uv run tests/synthetic_spec.py out.spec 1104 879   # 측정값이 아닌 생성 데이터, scan 1104 와 879 만
+uv run tests/synthetic_spec.py out.spec   # 측정값이 아닌 생성 데이터: data/data1-3.csv 와 그 scan 이 든 out.spec
+uv run main.py out.spec
 uv run rocking_curve.py out.spec
 ```
 
@@ -49,7 +50,7 @@ uv run --with pytest pytest
 spec.py            Spec, SpecScan 파서
 rocking_curve.py   rocking curve 비교 그림
 main.py            FWHM vs Q
-data/              scan 목록 CSV (실측 SPEC 파일의 scan 번호, SPEC 파일 자체는 없음)
+data/              (비어 있음) scan 목록 CSV 를 두는 곳, 생성기가 채운다
 tests/             생성 데이터 기반 pytest 와 생성기(synthetic_spec.py)
 ```
 

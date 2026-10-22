@@ -4,7 +4,11 @@ Nothing here is a measurement. The tags follow the SPEC layout that `spec.py` re
 `#F #E #D #C #O`, per scan `#S #D #T #Q #P #UXML #N #L` and data rows); the numbers come from
 `peak()` below, so a test knows the answer.
 
-    python tests/synthetic_spec.py OUT [SCAN_NUMBER ...]
+    python tests/synthetic_spec.py OUT_SPEC [DATA_DIR]    # DATA_DIR defaults to data/
+
+It also writes the scan lists `main.py` reads (`data1.csv`, `data2.csv`, `data3.csv`: no header,
+columns `scan, gamma, delta, theta`) and puts every scan they name, plus scans 879 and 1104 for
+`rocking_curve.py`, into the SPEC file.
 """
 
 import sys
@@ -17,6 +21,13 @@ MOTORS = ["Delta", "Theta", "Chi", "Phi", "Mu", "Gamma", "Sample_X", "Sample_Y",
           "SHOLD", "SDD", "DETY", "DETZ", "xt", "zt", "m1", "m2"]  # fmt: skip
 SDD = 600.0
 POINTS = 41
+EXTRA_SCANS = [879, 1104]  # the scans rocking_curve.py reads
+# (first scan number, gamma [deg], delta values [deg]) for each scan list
+SCAN_LISTS = {
+    "data1.csv": (101, 8.0, np.arange(20.0, 71.0, 5.0)),
+    "data2.csv": (201, 12.0, np.arange(25.0, 66.0, 5.0)),
+    "data3.csv": (301, 4.0, np.arange(30.0, 51.0, 5.0)),
+}
 
 
 def peak(scan_no: int) -> tuple[float, float, float, float]:
@@ -85,8 +96,23 @@ def write_spec(path: Path, scan_numbers: Iterable[int], **scan_options) -> Path:
     return path
 
 
+def write_scan_lists(directory: Path) -> list[int]:
+    """Write data1-3.csv (theta is half of 2theta, cos 2theta = cos delta cos gamma); return the scan numbers."""
+    directory.mkdir(parents=True, exist_ok=True)
+    numbers = []
+    for name, (first, gamma, delta) in SCAN_LISTS.items():
+        two_theta = np.degrees(np.arccos(np.cos(np.radians(delta)) * np.cos(np.radians(gamma))))
+        rows = [
+            f"{first + i},{gamma:.4f},{d:.4f},{t / 2:.4f}\n"
+            for i, (d, t) in enumerate(zip(delta, two_theta, strict=True))
+        ]
+        (directory / name).write_text("".join(rows), encoding="utf-8")
+        numbers += [first + i for i in range(len(rows))]
+    return numbers
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if not 2 <= len(sys.argv) <= 3:
         sys.exit(__doc__)
-    numbers = [int(a) for a in sys.argv[2:]] or [1, 2, 3, 879, 1104]
-    print(write_spec(Path(sys.argv[1]), numbers))
+    numbers = write_scan_lists(Path(sys.argv[2]) if len(sys.argv) == 3 else Path("data"))
+    print(write_spec(Path(sys.argv[1]), numbers + EXTRA_SCANS))

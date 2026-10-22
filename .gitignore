@@ -11,3 +11,4 @@ wheels/
 
 # raw beamline SPEC log (62 MB), not for the repository
 data/250626
+data/*.csv

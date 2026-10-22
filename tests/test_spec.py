@@ -1,6 +1,5 @@
 """The SPEC parser and the two scripts, on generated data (tests/synthetic_spec.py)."""
 
-import csv
 import runpy
 import sys
 from datetime import datetime
@@ -8,7 +7,17 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synthetic_spec import MOTORS, POINTS, SDD, fwhm, peak, scan_block, write_spec
+from synthetic_spec import (
+    EXTRA_SCANS,
+    MOTORS,
+    POINTS,
+    SDD,
+    fwhm,
+    peak,
+    scan_block,
+    write_scan_lists,
+    write_spec,
+)
 
 from spec import Spec
 
@@ -93,22 +102,26 @@ def test_q_geometry_against_the_textbook_value():
     )
 
 
-def run_script(name, spec_file, monkeypatch):
-    monkeypatch.chdir(ROOT)
+def run_script(name, spec_file, cwd, monkeypatch):
+    monkeypatch.chdir(cwd)
     monkeypatch.setattr(sys, "argv", [name, str(spec_file)])
     monkeypatch.syspath_prepend(str(ROOT))
     runpy.run_path(str(ROOT / name), run_name="__main__")
 
 
 def test_rocking_curve_script_runs_on_generated_scans(tmp_path, monkeypatch):
-    spec_file = write_spec(tmp_path / "s.spec", [1104, 879])
-    run_script("rocking_curve.py", spec_file, monkeypatch)
+    spec_file = write_spec(tmp_path / "s.spec", EXTRA_SCANS)
+    run_script("rocking_curve.py", spec_file, tmp_path, monkeypatch)
 
 
 def test_fwhm_vs_q_script_runs_on_generated_scans(tmp_path, monkeypatch):
-    numbers = []
-    for name in ("data1.csv", "data2.csv", "data3.csv"):
-        with open(ROOT / "data" / name, newline="") as f:
-            numbers += [int(row[0]) for row in csv.reader(f)]
+    numbers = write_scan_lists(tmp_path / "data")
     spec_file = write_spec(tmp_path / "s.spec", numbers)
-    run_script("main.py", spec_file, monkeypatch)
+    run_script("main.py", spec_file, tmp_path, monkeypatch)
+
+
+def test_scan_lists_name_scans_that_the_generated_spec_holds(tmp_path):
+    numbers = write_scan_lists(tmp_path / "data")
+    assert len(numbers) == len(set(numbers)) == 25
+    with Spec(write_spec(tmp_path / "s.spec", numbers)) as spec:
+        assert set(numbers) <= set(spec.scans)
