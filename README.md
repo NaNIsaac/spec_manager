@@ -26,7 +26,7 @@ uv run rocking_curve.py PATH_TO_SPEC   # 그 파일의 scan 1104, 879 rocking cu
 uv run main.py PATH_TO_SPEC            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
 ```
 
-두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)과 그 scan 목록 CSV 는 저장소에 없다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다. `data/data*.csv` 는 git 이 무시하므로 자기 scan 목록을 둬도 커밋되지 않는다.
+두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)과 그 scan 목록 CSV 는 현재 트리에 없다. 이전 커밋의 git 이력에는 남아 있고, 지우려면 이력 재작성(소유자 결정)이 필요하다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다. `data/data*.csv` 는 git 이 무시하므로 자기 scan 목록을 둬도 커밋되지 않는다.
 
 ```powershell
 uv run tests/synthetic_spec.py out.spec   # 측정값이 아닌 생성 데이터: data/data1-3.csv 와 그 scan 이 든 out.spec
