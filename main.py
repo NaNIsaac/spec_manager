@@ -49,7 +49,7 @@ def fit_gaussian_fwhm(x, y):
 
 
 def main():
-    file = "./250626"
+    file = "data/250626"
     energy_val = 5550
     # 제공해주신 오프셋 값
     GAMMA_OFF = 1.4367
