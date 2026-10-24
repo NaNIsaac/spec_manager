@@ -13,7 +13,7 @@ Python 3.13+, pandas, scipy, matplotlib.
 ```python
 from spec import Spec
 
-with Spec("data/250626") as spec:
+with Spec("path/to/file.spec") as spec:
     scan = spec.get_scan(1)
     scan.command, scan.time, scan.motors["Delta"]
     df = scan.to_dataframe()  # #L 열 이름 그대로
@@ -22,11 +22,27 @@ with Spec("data/250626") as spec:
 
 ```powershell
 uv sync
-uv run rocking_curve.py   # data/250626 의 scan 1104, 879 rocking curve (imroi1, 정규화, log)
-uv run main.py            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
+uv run rocking_curve.py PATH_TO_SPEC   # 그 파일의 scan 1104, 879 rocking curve (imroi1, 정규화, log)
+uv run main.py PATH_TO_SPEC            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, δ 오프셋 보정, 5550 eV)
 ```
 
-두 스크립트는 저장소 루트에서 실행한다. 에너지 · 오프셋 · 시료 라벨은 `main.py` 에 하드코딩되어 있다. `data/data*.csv` 는 헤더 없는 `scan, gamma, delta, theta` 4열.
+두 스크립트는 저장소 루트에서 실행한다. 스크립트가 쓰던 실측 SPEC 파일(2025-06-26, 3753 scans)과 그 scan 목록 CSV 는 현재 트리에 없다. 이전 커밋의 git 이력에는 남아 있고, 지우려면 이력 재작성(소유자 결정)이 필요하다. 파서와 스크립트를 시험해 보려면 생성된 데이터로 같은 형식의 파일을 만든다. `data/data*.csv` 는 git 이 무시하므로 자기 scan 목록을 둬도 커밋되지 않는다.
+
+```powershell
+uv run tests/synthetic_spec.py out.spec   # 측정값이 아닌 생성 데이터: data/data1-3.csv 와 그 scan 이 든 out.spec
+uv run main.py out.spec
+uv run rocking_curve.py out.spec
+```
+
+ 에너지 · 오프셋 · 시료 라벨은 `main.py` 에 하드코딩되어 있다. `data/data*.csv` 는 헤더 없는 `scan, gamma, delta, theta` 4열.
+
+## Test
+
+```powershell
+uv run --with pytest pytest
+```
+
+파서(필드, UXML 중첩·형 변환, 중복·잘못된 줄·없는 scan), Gaussian FWHM 적합, Q 계산(λ = 1 Å 에서 2θ = 60° 의 4π sin θ / λ), 두 스크립트의 실행을 생성 데이터로 확인한다. 실측 데이터로 얻은 결과를 확인하는 시험은 아니다.
 
 ## Structure
 
@@ -34,7 +50,8 @@ uv run main.py            # data/data*.csv 의 scan 별 Gaussian FWHM vs Q (γ, 
 spec.py            Spec, SpecScan 파서
 rocking_curve.py   rocking curve 비교 그림
 main.py            FWHM vs Q
-data/              예제 SPEC 파일(250626, 3753 scans)과 scan 목록 CSV
+data/              (비어 있음) scan 목록 CSV 를 두는 곳, 생성기가 채운다
+tests/             생성 데이터 기반 pytest 와 생성기(synthetic_spec.py)
 ```
 
 ## Where the same code lives now
