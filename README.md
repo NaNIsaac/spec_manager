@@ -16,8 +16,8 @@ from spec import Spec
 with Spec("path/to/file.spec") as spec:
     scan = spec.get_scan(1)
     scan.command, scan.time, scan.motors["Delta"]
-    df = scan.to_dataframe()         # #L 열 이름 그대로
-    scan.uxml                        # #UXML → dict
+    df = scan.to_dataframe()  # #L 열 이름 그대로
+    scan.uxml  # #UXML → dict
 ```
 
 ```powershell
