@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title description"><title id="title">spec_manager generated SPEC analysis workflow</title><desc id="description">Synthetic generator creates an out.spec file and scan-list CSV. The parser reads scan metadata and numeric columns. Plotting scripts produce rocking curves and Gaussian peak width versus Q; old parsing code is now also in QoraGeom.</desc>
+<rect x="0" y="0" width="1200" height="520" rx="16" fill="#f8fbfd" stroke="#f8fbfd" stroke-width="2"/>
+<text x="34" y="50" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#123759" font-size="30" font-weight="700">spec_manager / reproducing legacy scan analysis</text>
+<text x="34" y="81" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#54758d" font-size="18" font-weight="400">A generated input lets you explore the parser without using measured beamtime files.</text>
+<rect x="34" y="125" width="336" height="232" rx="16" fill="#fff" stroke="#d5e1ee" stroke-width="2"/>
+<text x="52" y="164" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#1b678f" font-size="21" font-weight="700">01  Generate test data</text>
+<text x="52" y="215" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">tests/synthetic_spec.py</text>
+<text x="52" y="244" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">out.spec  (#S, #L, #UXML)</text>
+<text x="52" y="273" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">data/data1-3.csv</text>
+<text x="52" y="302" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#9b6125" font-size="17" font-weight="700">SYNTHETIC, not measured</text>
+<path d="M374 241 h49 l-11 -9 m11 9 l-11 9" stroke="#4e86a8" stroke-width="3" fill="none"/>
+<rect x="434" y="125" width="336" height="232" rx="16" fill="#fff" stroke="#d5e1ee" stroke-width="2"/>
+<text x="452" y="164" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#1b678f" font-size="21" font-weight="700">02  Read and inspect</text>
+<text x="452" y="215" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">Spec / SpecScan</text>
+<text x="452" y="244" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">scan.motors, scan.uxml</text>
+<text x="452" y="273" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">scan.to_dataframe()</text>
+<text x="452" y="302" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">Timestamp + metadata</text>
+<path d="M774 241 h49 l-11 -9 m11 9 l-11 9" stroke="#4e86a8" stroke-width="3" fill="none"/>
+<rect x="834" y="125" width="336" height="232" rx="16" fill="#fff" stroke="#d5e1ee" stroke-width="2"/>
+<text x="852" y="164" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#1b678f" font-size="21" font-weight="700">03  Analyse</text>
+<text x="852" y="215" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">rocking_curve.py</text>
+<text x="852" y="244" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">main.py (FWHM vs Q)</text>
+<text x="852" y="273" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">Gaussian peak fits</text>
+<text x="852" y="302" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#3d5b72" font-size="17" font-weight="400">Project-specific constants</text>
+<rect x="34" y="384" width="1132" height="102" rx="16" fill="#19354b" stroke="#19354b" stroke-width="2"/>
+<text x="56" y="415" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#a0c9e4" font-size="14" font-weight="700">REPRODUCIBLE DEMO / run from the repository root</text>
+<text x="56" y="451" font-family="Consolas,monospace" fill="#e7f3fb" font-size="17" font-weight="400">uv run tests/synthetic_spec.py out.spec  &amp;&amp;  uv run main.py out.spec</text>
+<text x="34" y="511" font-family="Noto Sans CJK KR, Malgun Gothic, Arial, sans-serif" fill="#5b7890" font-size="15" font-weight="400">Maintained parser lives in QoraGeom; this repository preserves the original analysis scripts.</text></svg>
