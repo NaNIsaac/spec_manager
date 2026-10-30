@@ -4,6 +4,10 @@ Parser for SPEC (Certified Scientific Software) scan files, including `#O/#P` mo
 
 SPEC 데이터 파일을 `Spec` / `SpecScan` 객체로 읽는 파서와, 이를 이용한 분석 스크립트. 개인 분석 코드.
 
+![Diagram of generated SPEC files, parser objects and two analysis scripts](docs/media/readme-analysis.svg)
+
+*생성 SPEC 데이터에 기반한 **사용 흐름 개념도**이며 실제 측정 결과 이미지는 아닙니다. 아래 예제로 재현 가능합니다.*
+
 ## Requirements
 
 Python 3.13+, pandas, scipy, matplotlib.
