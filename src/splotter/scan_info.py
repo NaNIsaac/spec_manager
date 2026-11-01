@@ -6,10 +6,10 @@ from typing import Any
 
 import pandas as pd
 
-from splotter.spec import Spec, SpecScan
+from splotter.spec import Spec, SpecScan, find_name, run_id, scan_or_exit
 
 CELLS_PER_ROW = 4
-TIME = "time"  # for --columns: not a SPEC column, computed from Epoch or #D
+TIME = "time"  # for --columns: not a SPEC column, computed from Epoch and #D
 
 
 def value_grid(values: dict[str, float]) -> str:
@@ -29,11 +29,16 @@ def point_values(
     return at_point, {name: value for name, value in row.items() if name not in motors}
 
 
-def point_time(file_start: datetime, df: pd.DataFrame, point: int) -> datetime | None:
-    """Clock time of a data row: Epoch counts seconds from the #D line of the file header."""
+def point_time(scan: SpecScan, df: pd.DataFrame, point: int) -> datetime | None:
+    """Clock time of a data row, as #D of the scan plus the Epoch seconds since its first row.
+
+    Epoch counts from the file header, which a restarted SPEC session writes anew, and some files
+    have none. The first row follows #D by a second or two, which this leaves out.
+    """
     if "Epoch" not in df.columns or df.empty:
         return None
-    return file_start + timedelta(seconds=float(df["Epoch"].iloc[point]))
+    seconds = float(df["Epoch"].iloc[point] - df["Epoch"].iloc[0])
+    return scan.time + timedelta(seconds=seconds)
 
 
 def flatten(value: Any, prefix: str = "") -> Iterator[tuple[str, Any]]:
@@ -48,20 +53,28 @@ def flatten(value: Any, prefix: str = "") -> Iterator[tuple[str, Any]]:
         yield prefix, value
 
 
-def point_table(scan: SpecScan, file_start: datetime, names: list[str]) -> pd.DataFrame:
-    """The named data columns and motors of a scan, one row per point; "time" is the clock time."""
+def point_table(scan: SpecScan, names: list[str]) -> pd.DataFrame:
+    """The named data columns and motors of a scan, one row per point; "time" is the clock time.
+
+    Motors that stay put give one row, as their value would only repeat.
+    """
     df = scan.to_dataframe()
     table = pd.DataFrame(index=df.index.rename("point"))
+    only_fixed_motors = True
     for name in names:
+        column, motor = find_name(name, df.columns), find_name(name, scan.motors)
         if name == TIME and "Epoch" in df.columns:
-            table[name] = file_start + pd.to_timedelta(df["Epoch"], unit="s")
-        elif name in df.columns:
-            table[name] = df[name]
-        elif name in scan.motors:
-            table[name] = scan.motors[name]
+            seconds = df["Epoch"] - df["Epoch"].iloc[0]
+            table[name] = scan.time + pd.to_timedelta(seconds, unit="s")
+            only_fixed_motors = False
+        elif column:
+            table[name] = df[column]
+            only_fixed_motors = False
+        elif motor:
+            table[name] = scan.motors[motor]
         else:
-            raise SystemExit(f"scan {scan.scan_no} has no '{name}'; --names lists what it has")
-    return table
+            raise SystemExit(f"scan {scan.label} has no '{name}'; --names lists what it has")
+    return table.iloc[:1] if only_fixed_motors else table
 
 
 def scan_table(scans: list[SpecScan], names: list[str]) -> pd.DataFrame:
@@ -70,10 +83,13 @@ def scan_table(scans: list[SpecScan], names: list[str]) -> pd.DataFrame:
     for scan in scans:
         row = {}
         for name in names:
-            if name != TIME and name not in scan.motors:
-                raise SystemExit(f"no motor '{name}'; give a scan number to read counters")
-            row[name] = scan.time if name == TIME else scan.motors[name]
-        rows[scan.scan_no] = row
+            motor = find_name(name, scan.motors)
+            if name != TIME and not motor:
+                raise SystemExit(
+                    f"scan {scan.label} has no motor '{name}'; give a run for counters"
+                )
+            row[name] = scan.time if name == TIME else scan.motors[motor]
+        rows[scan.label] = row
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("scan")
 
 
@@ -81,14 +97,14 @@ def print_table(table: pd.DataFrame, csv: bool) -> None:
     print(table.to_csv(lineterminator="\n").rstrip() if csv else table.to_string())
 
 
-def print_scan_list(scans: list[SpecScan], file_start: datetime) -> None:
+def print_scan_list(scans: list[SpecScan]) -> None:
     print(f"{'scan':>5}  {'start':<19}  {'duration':>8}  {'points':>6}  command")
     for scan in scans:
         df = scan.to_dataframe()
-        end = point_time(file_start, df, -1)
+        end = point_time(scan, df, -1)
         duration = str(end - scan.time) if end else "-"
         print(
-            f"{scan.scan_no:>5}  {scan.time:%Y-%m-%d %H:%M:%S}  {duration:>8}  {len(df):>6}  {scan.command}"
+            f"{scan.label:>5}  {scan.time:%Y-%m-%d %H:%M:%S}  {duration:>8}  {len(df):>6}  {scan.command}"
         )
 
 
@@ -106,7 +122,12 @@ def main() -> None:
         description="Times, motors, counters and metadata of the scans in a SPEC file."
     )
     parser.add_argument("spec_file", type=Path)
-    parser.add_argument("scan", type=int, nargs="?", help="default: list all scans of the file")
+    parser.add_argument(
+        "scan",
+        type=run_id,
+        nargs="?",
+        help="run number, 12.2 for the second scan numbered 12; default: list all scans of the file",
+    )
     parser.add_argument(
         "point",
         type=int,
@@ -141,13 +162,10 @@ def main() -> None:
         parser.error("--top ranks the points of one scan")
 
     with Spec(args.spec_file) as spec:
-        if args.scan is not None and args.scan not in spec.scans:
-            raise SystemExit(f"no scan {args.scan}; the file has scans up to {max(spec.scans)}")
-        file_start = datetime.strptime(spec.file_metadata["#D"], "%a %b %d %H:%M:%S %Y")
+        pass
 
     if args.scan is None:
-        scans = list(spec.scans.values())
-        scans = scans[-args.last :] if args.last else scans
+        scans = spec.all_scans[-args.last :] if args.last else spec.all_scans
         if args.names:
             print("\n".join([TIME, *spec.motor_names]))
         elif args.meta:
@@ -156,10 +174,10 @@ def main() -> None:
         elif args.columns:
             print_table(scan_table(scans, args.columns), args.csv)
         else:
-            print_scan_list(scans, file_start)
+            print_scan_list(scans)
         return
 
-    scan = spec.get_scan(args.scan)
+    scan = scan_or_exit(spec, args.scan)
     df = scan.to_dataframe()
     if args.point is not None and not 0 <= args.point < len(df):
         raise SystemExit(f"no point {args.point}; scan {args.scan} has points 0 to {len(df) - 1}")
@@ -167,7 +185,7 @@ def main() -> None:
         print("\n".join(dict.fromkeys([TIME, *df.columns, *scan.motors])))
         return
     if args.columns:
-        table = point_table(scan, file_start, args.columns)
+        table = point_table(scan, args.columns)
         if args.top:
             table = table.nlargest(args.top, args.columns[0])
         if args.point is not None:
@@ -175,9 +193,9 @@ def main() -> None:
         print_table(table, args.csv)
         return
 
-    print(f"Scan {scan.scan_no}: {scan.command}")
+    print(f"Scan {scan.label}: {scan.command}")
     print(f"Started: {scan.time}")
-    print(f"Last point: {point_time(file_start, df, -1) or '-'}")
+    print(f"Last point: {point_time(scan, df, -1) or '-'}")
     print(f"Points: {len(df)}")
 
     if args.meta:
@@ -192,7 +210,7 @@ def main() -> None:
             print(f"\nCounters over the scan:\n{summary.to_string()}")
     else:
         motors, counters = point_values(scan.motors, df, args.point)
-        print(f"\nTime at point {args.point}: {point_time(file_start, df, args.point) or '-'}")
+        print(f"\nTime at point {args.point}: {point_time(scan, df, args.point) or '-'}")
         print(f"\nMotors at point {args.point}:\n{value_grid(motors)}")
         print(f"\nCounters at point {args.point}:\n{value_grid(counters)}")
 

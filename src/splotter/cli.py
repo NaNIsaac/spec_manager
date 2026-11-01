@@ -30,6 +30,11 @@ def main(argv: list[str] | None = None) -> None:
     elif command in COMMANDS:
         module, _ = COMMANDS[command]
         sys.argv = [f"splotter {command}", *args]
-        importlib.import_module(module).main()
+        try:
+            importlib.import_module(module).main()
+        except FileNotFoundError as error:
+            raise SystemExit(
+                f"no such file: '{error.filename}'\nusage: splotter {command} SPEC_FILE ..."
+            ) from None
     else:
         raise SystemExit(f"unknown command '{command}'\n\n{usage()}")

@@ -58,13 +58,15 @@ splotter info demo.spec --meta        # file header
 ### Pull values by name
 
 `-c` prints only the named data columns and motors, as a table. `time` gives the clock time of each
-point, computed from the `Epoch` column and the `#D` line of the file header.
+point: the `#D` time of the scan plus the `Epoch` seconds since its first point. Names match without
+regard to case, spaces and underscores, so `Sample_X` also finds the `Sample X` of older files.
 
 ```
 splotter info demo.spec 1 -c time Sample_X Sample_Y imtot
 splotter info demo.spec 1 -c imtot Sample_X Sample_Y --top 5    # the 5 points largest in imtot
 splotter info demo.spec 1 -c Sample_X imtot --csv > scan1.csv
 splotter info demo.spec -c time Delta Gamma --last 3            # motors at the start of each scan
+splotter info demo.spec 1 -c Delta Chi                          # motors that stay put: one row
 splotter info demo.spec 1 --names                               # the names -c accepts
 ```
 
@@ -94,6 +96,17 @@ splotter fwhm demo.spec demo_fwhm.csv --energy 8 --counter imroi3
 The scan lists for `fwhm` are CSV files without a header, with the columns
 `scan, gamma, delta, theta`.
 
+## Files from different years
+
+The parser was checked on some 3,600 SPEC files from 2005 to 2026:
+
+- Names may contain one space (`Sample Y`). Two spaces or a tab separate them.
+- A SPEC session that restarts inside a file brings a new header, and its motors apply from there.
+- When a restart reuses a run number, the plain number means the last such scan and `12.1`, `12.2`
+  name each one. `splotter info FILE` lists them that way.
+- Lines between the data that are not a row of the `#L` columns, such as macro output, are skipped.
+- Files before 2015 have no `imtot`, so `splotter mesh` needs `--counter`. `--names` lists the options.
+
 ## Python
 
 ```python
@@ -108,8 +121,8 @@ with Spec("demo.spec") as spec:
 
 ## Status
 
-Alpha. The tests run on generated data (`splotter demo` and `tests/synthetic_spec.py`). The commands
-were also run on one measured file from one beamline, so other SPEC setups may differ, in particular
+Alpha. The tests run on generated data (`splotter demo` and `tests/synthetic_spec.py`). The parser
+was also run on the measured files of one beamline, so other SPEC setups may differ, in particular
 in motor names.
 
 [QoraGeom](https://github.com/NaNIsaac/QoraGeom) has its own, extended copy of this parser as

@@ -292,10 +292,10 @@ def test_scan_info_script_prints_one_point(tmp_path, monkeypatch, capsys):
 
 
 def test_scan_info_script_prints_the_clock_time_of_a_point(tmp_path, monkeypatch, capsys):
-    # the generated header says 12:00:00 and Epoch is the row number
+    # scan 12 starts at 12:24:30 and Epoch is the row number
     spec_file = write_spec(tmp_path / "s.spec", [12])
     run_script("info", [spec_file, 12, 3], monkeypatch)
-    assert "Time at point 3: 2025-06-26 12:00:03" in capsys.readouterr().out
+    assert "Time at point 3: 2025-06-26 12:24:33" in capsys.readouterr().out
 
 
 def test_scan_info_script_lists_the_scans_of_the_file(tmp_path, monkeypatch, capsys):
@@ -332,13 +332,19 @@ def test_scan_info_columns_gives_one_row_per_point(tmp_path, monkeypatch, capsys
     table = scan_info_table(spec_file, [12, "-c", "time", "imroi1", "Delta"], monkeypatch, capsys)
     assert table.columns.tolist() == ["point", "time", "imroi1", "Delta"]
     assert len(table) == POINTS and table["Delta"].eq(2.0).all()
-    assert table["time"].iloc[3] == "2025-06-26 12:00:03"
+    assert table["time"].iloc[3] == "2025-06-26 12:24:33"
 
 
 def test_scan_info_columns_of_one_point(tmp_path, monkeypatch, capsys):
     spec_file = write_spec(tmp_path / "s.spec", [12])
     table = scan_info_table(spec_file, [12, 3, "-c", "Epoch"], monkeypatch, capsys)
     assert table.to_dict("records") == [{"point": 3, "Epoch": 3}]
+
+
+def test_scan_info_columns_of_fixed_motors_gives_one_row(tmp_path, monkeypatch, capsys):
+    spec_file = write_spec(tmp_path / "s.spec", [12])
+    table = scan_info_table(spec_file, [12, "-c", "delta", "Chi"], monkeypatch, capsys)
+    assert table.to_dict("records") == [{"point": 0, "delta": 2.0, "Chi": 4.0}]
 
 
 def test_scan_info_top_ranks_points_by_the_first_column(tmp_path, monkeypatch, capsys):
@@ -353,7 +359,7 @@ def test_scan_info_columns_without_a_scan_reads_motors_of_each_scan(tmp_path, mo
     spec_file = write_spec(tmp_path / "s.spec", [7, 12])
     table = scan_info_table(spec_file, ["-c", "Delta", "--last", 1], monkeypatch, capsys)
     assert table.to_dict("records") == [{"scan": 12, "Delta": 2.0}]
-    with pytest.raises(SystemExit, match="give a scan number"):
+    with pytest.raises(SystemExit, match="give a run for counters"):
         run_script("info", [spec_file, "-c", "imroi1"], monkeypatch)
 
 

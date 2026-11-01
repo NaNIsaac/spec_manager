@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-11-02
 
 First release, under the new name splotter (formerly spec_manager).
 
@@ -16,6 +16,16 @@ First release, under the new name splotter (formerly spec_manager).
   `--csv`, `--names`).
 - `splotter mesh`: counter maps that combine mesh, ascan and dscan scans and mark what was not
   measured.
+
+### Fixed
+
+- Motor and column names with a space (`Sample Y`) no longer shift the values after them.
+- A SPEC session restarted inside a file no longer changes the time of the scan before it, and its
+  motor names apply from there on.
+- Times of points no longer depend on the file header.
+- Scans that reuse a run number are kept: `12.1` and `12.2` name them, `12` the last one.
+- Macro output between the data no longer enters the data.
+- Files without a header, without scans or with bytes that are not UTF-8 no longer stop the commands.
 
 ### Changed
 

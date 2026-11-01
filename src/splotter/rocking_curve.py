@@ -4,7 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from splotter.spec import Spec
+from splotter.spec import Spec, run_id, scan_or_exit
 
 plt.rcParams["font.weight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
@@ -17,7 +17,7 @@ def main() -> None:
         description="Normalized rocking curves (counter vs first column) of SPEC scans, log scale."
     )
     parser.add_argument("spec_file", type=Path)
-    parser.add_argument("scans", type=int, nargs="+")
+    parser.add_argument("scans", type=run_id, nargs="+")
     parser.add_argument(
         "--labels", nargs="+", help="one legend label per scan (default: scan number)"
     )
@@ -30,7 +30,7 @@ def main() -> None:
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     with Spec(args.spec_file) as spec:
         for scan_n, label in zip(args.scans, labels, strict=True):
-            scan = spec.get_scan(scan_n)
+            scan = scan_or_exit(spec, scan_n)
             print(f"Command: {scan.command}")
             df = scan.to_dataframe()
             theta = df.iloc[:, 0].to_numpy()

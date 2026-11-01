@@ -9,7 +9,7 @@ from matplotlib.colors import LogNorm, Normalize
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.patheffects import Normal, Stroke
 
-from splotter.spec import Spec, SpecScan
+from splotter.spec import Spec, SpecScan, find_name, name_key, run_id, scan_or_exit
 
 plt.rcParams["font.weight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
@@ -35,7 +35,7 @@ def outline_style(index: int) -> tuple[str, str]:
 class ScanMap:
     """One scan on the motor plane: values[iy, ix] fills the cell between the edges; NaN = not measured."""
 
-    run: int
+    run: str
     x_edges: np.ndarray
     y_edges: np.ndarray
     values: np.ndarray
@@ -65,46 +65,47 @@ def scan_map(scan: SpecScan, counter: str, x: str, y: str) -> ScanMap:
     """A mesh of motors x and y, or an ascan/dscan of one of them at the #P position of the other."""
     df = scan.to_dataframe()
     if df.empty:
-        raise SystemExit(f"scan {scan.scan_no} has no data")
-    if counter not in df.columns:
+        raise SystemExit(f"scan {scan.label} has no data")
+    column = find_name(counter, df.columns)
+    if not column:
         raise SystemExit(f"no counter '{counter}'; columns: {', '.join(df.columns)}")
 
-    measured = df[counter].to_numpy(dtype=float)
+    measured = df[column].to_numpy(dtype=float)
+    x_key, y_key = name_key(x), name_key(y)
     tokens = scan.command.split()
     if "mesh" in tokens[0]:
         # e.g. "mesh sy -2.5 -1.5 25 sx -6.7 -5.7 25 0.5"; 25 is the number of intervals
         fast, slow = df.columns[:2]
-        if {fast, slow} != {x, y}:
-            raise SystemExit(f"scan {scan.scan_no} moves {fast} and {slow}, not {x} and {y}")
+        if {name_key(fast), name_key(slow)} != {x_key, y_key}:
+            raise SystemExit(f"scan {scan.label} moves {fast} and {slow}, not {x} and {y}")
         fast_pos, fast_step = centres(*tokens[2:5], df[fast].iloc[0])
         slow_pos, slow_step = centres(*tokens[6:9], df[slow].iloc[0])
         grid = np.full(fast_pos.size * slow_pos.size, np.nan)
         grid[: measured.size] = measured
         grid = grid.reshape(slow_pos.size, fast_pos.size)
         x_edges, y_edges = edges(slow_pos, slow_step), edges(fast_pos, fast_step)
-        if fast == x:
-            return ScanMap(
-                scan.scan_no, edges(fast_pos, fast_step), edges(slow_pos, slow_step), grid
-            )
-        return ScanMap(scan.scan_no, x_edges, y_edges, grid.T)
+        if name_key(fast) == x_key:
+            return ScanMap(scan.label, edges(fast_pos, fast_step), edges(slow_pos, slow_step), grid)
+        return ScanMap(scan.label, x_edges, y_edges, grid.T)
 
     if tokens[0] not in ("ascan", "dscan"):
-        raise SystemExit(f"scan {scan.scan_no} is neither a mesh nor an ascan: '{scan.command}'")
+        raise SystemExit(f"scan {scan.label} is neither a mesh nor an ascan: '{scan.command}'")
     moved = df.columns[0]
-    if moved not in (x, y):
-        raise SystemExit(f"scan {scan.scan_no} moves {moved}, not {x} or {y}")
-    fixed = y if moved == x else x
-    if fixed not in scan.motors:
-        raise SystemExit(f"scan {scan.scan_no} records no position of {fixed}")
+    if name_key(moved) not in (x_key, y_key):
+        raise SystemExit(f"scan {scan.label} moves {moved}, not {x} or {y}")
+    along_x = name_key(moved) == x_key
+    fixed = find_name(y if along_x else x, scan.motors)
+    if not fixed:
+        raise SystemExit(f"scan {scan.label} records no position of {y if along_x else x}")
 
     along, step = centres(*tokens[2:5], df[moved].iloc[0])
     values = np.full(along.size, np.nan)
     values[: measured.size] = measured
     # a line has no width of its own: draw square cells
     across = edges(np.array([scan.motors[fixed]]), abs(step))
-    if moved == x:
-        return ScanMap(scan.scan_no, edges(along, step), across, values[np.newaxis, :])
-    return ScanMap(scan.scan_no, across, edges(along, step), values[:, np.newaxis])
+    if along_x:
+        return ScanMap(scan.label, edges(along, step), across, values[np.newaxis, :])
+    return ScanMap(scan.label, across, edges(along, step), values[:, np.newaxis])
 
 
 def color_scale(maps: list[ScanMap], log: bool) -> Normalize:
@@ -131,7 +132,7 @@ def main() -> None:
         "Several scans share the axes and the color scale; later runs draw over earlier ones."
     )
     parser.add_argument("spec_file", type=Path)
-    parser.add_argument("scans", type=int, nargs="+", help="mesh, ascan or dscan run numbers")
+    parser.add_argument("scans", type=run_id, nargs="+", help="mesh, ascan or dscan run numbers")
     parser.add_argument("--counter", default="imtot", help="e.g. imtot, imroi1, imroi2, immax")
     parser.add_argument("--x", default="Sample_X", help="motor of the horizontal axis")
     parser.add_argument("--y", default="Sample_Y", help="motor of the vertical axis")
@@ -145,9 +146,7 @@ def main() -> None:
     maps = []
     with Spec(args.spec_file) as spec:
         for run in args.scans:
-            if run not in spec.scans:
-                raise SystemExit(f"no scan {run}; the file has scans up to {max(spec.scans)}")
-            scan = spec.get_scan(run)
+            scan = scan_or_exit(spec, run)
             print(f"Scan {run}: {scan.command}")
             maps.append(scan_map(scan, args.counter, args.x, args.y))
             value, x, y = maps[-1].peak()

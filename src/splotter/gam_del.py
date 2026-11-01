@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.widgets import Slider, TextBox
 
-from splotter.spec import Spec
+from splotter.spec import Spec, run_id, scan_or_exit
 
 
 def calculate_theory_delta(gamma_array, tth):
@@ -21,7 +21,7 @@ def load_run_data(sp: Spec, run_ns: list[int]) -> pd.DataFrame:
     """Gamma and Delta of the given runs as a DataFrame, in the order of run_ns."""
     data = []
     for run_n in run_ns:
-        scan = sp.get_scan(run_n)
+        scan = scan_or_exit(sp, run_n)
         gamma = scan.motors.get("Gamma", np.nan)
         delta = scan.motors.get("Delta", np.nan)
         data.append({"run_n": run_n, "gamma": gamma, "delta": delta})
@@ -34,7 +34,9 @@ def main():
         description="Measured gamma/delta of runs against the theoretical arc of one 2theta."
     )
     parser.add_argument("spec_file", type=Path)
-    parser.add_argument("runs", type=int, nargs="+", help="run numbers, plotted in the given order")
+    parser.add_argument(
+        "runs", type=run_id, nargs="+", help="run numbers, plotted in the given order"
+    )
     args = parser.parse_args()
     spec_file, run_ns = args.spec_file, args.runs
 
