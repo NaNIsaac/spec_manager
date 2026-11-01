@@ -7,7 +7,7 @@ Write the file:
 
 <!-- test console -->
 ```console
-$ uv run -q --no-project --with splotter splotter demo tutorial.spec
+$ uv run -q --no-project --python 3.13 --with splotter splotter demo tutorial.spec
 wrote tutorial.spec
 wrote tutorial_fwhm.csv
 ```
@@ -30,7 +30,7 @@ Scan 5 was aborted after 100 of its 231 points. Ask scan 1 for its three brighte
 
 <!-- test console -->
 ```console
-$ uv run -q --no-project --with splotter splotter info tutorial.spec 1 -c imtot Sample_X Sample_Y --top 3 --csv
+$ uv run -q --no-project --python 3.13 --with splotter splotter info tutorial.spec 1 -c imtot Sample_X Sample_Y --top 3 --csv
 point,imtot,Sample_X,Sample_Y
 301,97699.0,0.4,-0.3
 300,45909.0,0.4,-0.4
