@@ -13,3 +13,4 @@ wheels/
 data/
 *.spec
 *.png
+!docs/media/*.png

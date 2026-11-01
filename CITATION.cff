@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "splotter: read SPEC scan files from the command line"
+authors:
+  - family-names: Yong
+    given-names: Isaac
+    email: isaacyong@naver.com
+    affiliation: "Sogang University"
+license: MIT
+repository-code: "https://github.com/NaNIsaac/splotter"
+abstract: "Command-line tools and a parser for SPEC scan files: scan lists, point values by column name, metadata, mesh maps that combine several scans, rocking curves and peak widths."
+keywords:
+  - "SPEC"
+  - "X-ray diffraction"
+  - "synchrotron"
+  - "mesh scan"
+  - "rocking curve"
+version: "0.1.0"
+date-released: "2026-11-02"

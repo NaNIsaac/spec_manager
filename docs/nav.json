@@ -1,0 +1,23 @@
+{
+  "sidebar": [
+    {
+      "text": "Getting Started",
+      "items": [
+        { "text": "Overview", "link": "index.md" },
+        { "text": "Installation", "link": "install.md" },
+        { "text": "Tutorial", "link": "tutorial.md" }
+      ]
+    },
+    {
+      "text": "Guides",
+      "items": [
+        { "text": "Looking up scans", "link": "guides/looking-up-scans.md" },
+        { "text": "Mesh maps", "link": "guides/mesh-maps.md" },
+        { "text": "Rocking curves and peak widths", "link": "guides/rocking-and-widths.md" },
+        { "text": "SPEC files across the years", "link": "guides/spec-formats.md" },
+        { "text": "Figure reproduction", "link": "media/README.md" },
+        { "text": "Changelog", "link": "https://github.com/NaNIsaac/splotter/blob/main/CHANGELOG.md" }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- The `splotter mesh` window takes the shape of the map: tall for a tall map, wide for a wide one.
+
+### Added
+
+- Documentation in `docs/`, a citation file, and a check that the README commands run.
+
 ## [0.1.0] - 2026-11-02
 
 First release, under the new name splotter (formerly spec_manager).

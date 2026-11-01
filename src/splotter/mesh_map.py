@@ -23,6 +23,9 @@ OUTLINE_COLORS = ["#6fc7d6", "#9ccc65", "#e8e8e8", "#b9a3e3"]
 OUTLINE_STYLES = ["solid", "dashed", "dashdot", "dotted"]
 # a thin dark edge keeps them on the gray fill
 OUTLINE_HALO = [Stroke(linewidth=1.8, foreground="black", alpha=0.5), Normal()]
+# inches
+MAX_MAP_SIDE, MIN_MAP_SIDE = 6.0, 2.5
+COLORBAR_AND_LABELS, TITLE_AND_LABELS = 2.2, 1.6
 
 
 def outline_style(index: int) -> tuple[str, str]:
@@ -126,6 +129,18 @@ def shown_values(values: np.ndarray, norm: Normalize) -> np.ndarray:
     return values
 
 
+def figure_size(x_span: float, y_span: float) -> tuple[float, float]:
+    """Width and height in inches: the axes keep equal units, so the window takes the shape of the map.
+
+    The long side of the map stays the same; the short side stops shrinking at MIN_MAP_SIDE, so that
+    a very narrow map still has room for its labels.
+    """
+    aspect = x_span / y_span
+    width = max(MAX_MAP_SIDE * min(aspect, 1), MIN_MAP_SIDE)
+    height = max(MAX_MAP_SIDE * min(1 / aspect, 1), MIN_MAP_SIDE)
+    return width + COLORBAR_AND_LABELS, height + TITLE_AND_LABELS
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Map of one counter over the motor positions of SPEC mesh and line scans. "
@@ -155,10 +170,7 @@ def main() -> None:
     norm = color_scale(maps, args.log)
     x_span = max(m.x_edges.max() for m in maps) - min(m.x_edges.min() for m in maps)
     y_span = max(m.y_edges.max() for m in maps) - min(m.y_edges.min() for m in maps)
-    # the axes keep equal units, so the figure follows the shape of the data
-    fig, ax = plt.subplots(
-        1, 1, figsize=(max(5.5, 5 * x_span / y_span + 2.5), 6), layout="constrained"
-    )
+    fig, ax = plt.subplots(1, 1, figsize=figure_size(x_span, y_span), layout="constrained")
     ax.patch.set(facecolor=NOT_MEASURED_FILL, edgecolor=NOT_MEASURED_HATCH, hatch="///")
     several = len(maps) > 1
     legend_handles = []

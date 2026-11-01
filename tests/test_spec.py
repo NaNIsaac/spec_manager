@@ -226,6 +226,15 @@ def test_a_log_scale_shows_zero_counts_but_keeps_unmeasured_points_empty():
         color_scale([ScanMap(1, np.arange(2.0), np.arange(2.0), np.zeros((1, 1)))], log=True)
 
 
+def test_the_figure_takes_the_shape_of_the_map():
+    from splotter.mesh_map import figure_size
+
+    wide, tall, square = figure_size(4, 1), figure_size(1, 4), figure_size(1, 1)
+    assert wide[0] > wide[1] and tall[1] > tall[0]
+    assert wide[0] == tall[1] - 1.6 + 2.2 == square[0]
+    assert figure_size(100, 1)[1] == figure_size(4, 1)[1]
+
+
 def test_outline_style_tells_scans_apart():
     from splotter.mesh_map import OUTLINE_COLORS, OUTLINE_STYLES, outline_style
 
