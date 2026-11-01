@@ -139,6 +139,13 @@ def main() -> None:
     )
     parser.add_argument("--last", type=int, help="list only the last N scans")
     parser.add_argument(
+        "--scans",
+        type=run_id,
+        nargs="+",
+        metavar="RUN",
+        help="with -c and no scan: only these scans, read in one go",
+    )
+    parser.add_argument(
         "-c",
         "--columns",
         nargs="+",
@@ -160,12 +167,16 @@ def main() -> None:
         parser.error("--top and --csv go with --columns")
     if args.top and (args.scan is None or args.point is not None):
         parser.error("--top ranks the points of one scan")
+    if args.scans and (args.scan is not None or not args.columns):
+        parser.error("--scans goes with --columns and no scan")
 
     with Spec(args.spec_file) as spec:
         pass
 
     if args.scan is None:
         scans = spec.all_scans[-args.last :] if args.last else spec.all_scans
+        if args.scans:
+            scans = [scan_or_exit(spec, run) for run in args.scans]
         if args.names:
             print("\n".join([TIME, *spec.motor_names]))
         elif args.meta:

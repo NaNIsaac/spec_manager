@@ -384,6 +384,16 @@ def test_scan_info_columns_without_a_scan_reads_motors_of_each_scan(tmp_path, mo
         run_script("info", [spec_file, "-c", "imroi1"], monkeypatch)
 
 
+def test_scan_info_scans_picks_the_listed_runs_in_one_read(tmp_path, monkeypatch, capsys):
+    spec_file = write_spec(tmp_path / "s.spec", [7, 12, 20])
+    table = scan_info_table(spec_file, ["-c", "Delta", "--scans", 20, 7], monkeypatch, capsys)
+    assert [row["scan"] for row in table.to_dict("records")] == [20, 7]
+    with pytest.raises(SystemExit, match="no scan 99"):
+        run_script("info", [spec_file, "-c", "Delta", "--scans", 99], monkeypatch)
+    with pytest.raises(SystemExit):
+        run_script("info", [spec_file, "--scans", 7], monkeypatch)
+
+
 def test_scan_info_names_lists_what_columns_accepts(tmp_path, monkeypatch, capsys):
     spec_file = write_spec(tmp_path / "s.spec", [12])
     run_script("info", [spec_file, 12, "--names"], monkeypatch)

@@ -99,6 +99,13 @@ scan
 8    2026-01-01 09:19:33   50.0    0.0
 ```
 
+`--scans` picks the scans by number, in the order given, and reads the file once. This is much faster
+than one `splotter info` call per scan:
+
+```
+splotter info demo.spec -c Gamma --scans 2 5 7
+```
+
 ## Metadata
 
 ```

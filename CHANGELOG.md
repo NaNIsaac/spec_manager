@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `splotter info FILE -c NAME --scans RUN [RUN ...]`: motors at the start of the listed scans only,
+  from a single read of the file.
+
 ## [0.1.1] - 2026-11-02
 
 ### Changed
