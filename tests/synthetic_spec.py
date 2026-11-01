@@ -1,14 +1,14 @@
-"""Write a SPEC-format file made of generated data, for the tests and for trying the scripts.
+"""Write a SPEC-format file made of generated data, for the tests and for trying the commands.
 
-Nothing here is a measurement. The tags follow the SPEC layout that `spec.py` reads (file header
+Nothing here is a measurement. The tags follow the SPEC layout that `splotter.spec` reads (file header
 `#F #E #D #C #O`, per scan `#S #D #T #Q #P #UXML #N #L` and data rows); the numbers come from
 `peak()` below, so a test knows the answer.
 
     python tests/synthetic_spec.py OUT_SPEC [DATA_DIR]    # DATA_DIR defaults to data/
 
-It also writes the scan lists `main.py` reads (`data1.csv`, `data2.csv`, `data3.csv`: no header,
+It also writes scan lists for `splotter fwhm` (`data1.csv`, `data2.csv`, `data3.csv`: no header,
 columns `scan, gamma, delta, theta`) and puts every scan they name, plus scans 879 and 1104 for
-`rocking_curve.py`, into the SPEC file.
+`splotter rock` and `splotter gamdel`, into the SPEC file.
 """
 
 import sys
@@ -21,7 +21,7 @@ MOTORS = ["Delta", "Theta", "Chi", "Phi", "Mu", "Gamma", "Sample_X", "Sample_Y",
           "SHOLD", "SDD", "DETY", "DETZ", "xt", "zt", "m1", "m2"]  # fmt: skip
 SDD = 600.0
 POINTS = 41
-EXTRA_SCANS = [879, 1104]  # the scans rocking_curve.py reads
+EXTRA_SCANS = [879, 1104]  # scans outside the lists, for splotter rock and gamdel
 # (first scan number, gamma [deg], delta values [deg]) for each scan list
 SCAN_LISTS = {
     "data1.csv": (101, 8.0, np.arange(20.0, 71.0, 5.0)),
@@ -86,6 +86,35 @@ def scan_block(scan_no: int, *, uxml: bool = True, bad_row: bool = False) -> lis
             lines.append("not a number row")
     lines.append("")
     return lines
+
+
+def mesh_block(scan_no: int, *, points: int | None = None) -> list[str]:
+    """A 3 x 2 mesh with one bright point at sy = 0.5, sx = 2; `points` stops it early."""
+    lines = [
+        f"#S {scan_no}  mesh sy 0 1 2 sx 1 2 1  0.5",
+        "#D Thu Jun 26 12:24:30 2025",
+        "#N 3",
+        "#L Sample_Y  Sample_X  imtot",
+    ]
+    rows = [(sy, sx, 100 if (sy, sx) == (0.5, 2) else 1) for sx in (1, 2) for sy in (0, 0.5, 1)]
+    lines += [f"{sy} {sx} {counts}" for sy, sx, counts in rows[:points]]
+    lines.append("")
+    return lines
+
+
+def line_block(scan_no: int) -> list[str]:
+    """An ascan of sx from 1 to 2 at Sample_Y = 3; the point at sx = 1.5 is the bright one."""
+    return [
+        f"#S {scan_no}  ascan  sx 1 2 2 0.5",
+        "#D Thu Jun 26 12:24:30 2025",
+        "#P0 0 0 0 0 0 0 1 3",
+        "#N 2",
+        "#L Sample_X  imtot",
+        "1 5",
+        "1.5 50",
+        "2 0",
+        "",
+    ]
 
 
 def write_spec(path: Path, scan_numbers: Iterable[int], **scan_options) -> Path:

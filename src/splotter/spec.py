@@ -157,24 +157,3 @@ class Spec:
 
     def get_scan(self, scan_no: int) -> SpecScan:
         return self.scans[scan_no]
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) != 2:
-        sys.exit("usage: python spec.py SPEC_FILE")
-    with Spec(sys.argv[1]) as spec:
-        scan = spec.get_scan(1)
-
-        # 1. 헬퍼 프로퍼티 사용
-        sdd = scan.sdd_from_uxml
-
-        # 2. 직접 딕셔너리 접근
-        # <ad_detector> 태그 아래 <sample_detector_distance>가 있는 구조
-        try:
-            raw_sdd = scan.uxml["ad_detector"]["sample_detector_distance"]
-        except KeyError:
-            raw_sdd = scan.motors.get("SDD", 0)  # 모터에서 Fallback
-
-        print(f"Distance (UXML): {sdd} mm")
