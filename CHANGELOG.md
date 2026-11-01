@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The `splotter mesh` window takes the shape of the map: tall for a tall map, wide for a wide one.
+- The `splotter mesh` color scale ends at 10 times the mean instead of the maximum; `--vmax` sets it.
+  The printed lines also give the mean of each scan.
+- `splotter mesh` has minor ticks on the axes and the color bar, which keeps the height of the map.
 
 ### Added
 

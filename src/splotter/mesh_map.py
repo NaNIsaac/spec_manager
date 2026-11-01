@@ -8,6 +8,8 @@ import numpy as np
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.patheffects import Normal, Stroke
+from matplotlib.ticker import AutoMinorLocator
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from splotter.spec import Spec, SpecScan, find_name, name_key, run_id, scan_or_exit
 
@@ -23,6 +25,7 @@ OUTLINE_COLORS = ["#6fc7d6", "#9ccc65", "#e8e8e8", "#b9a3e3"]
 OUTLINE_STYLES = ["solid", "dashed", "dashdot", "dotted"]
 # a thin dark edge keeps them on the gray fill
 OUTLINE_HALO = [Stroke(linewidth=1.8, foreground="black", alpha=0.5), Normal()]
+MEAN_FACTOR = 10  # the color scale ends at this many times the mean
 # inches
 MAX_MAP_SIDE, MIN_MAP_SIDE = 6.0, 2.5
 COLORBAR_AND_LABELS, TITLE_AND_LABELS = 2.2, 1.6
@@ -111,15 +114,20 @@ def scan_map(scan: SpecScan, counter: str, x: str, y: str) -> ScanMap:
     return ScanMap(scan.label, across, edges(along, step), values[:, np.newaxis])
 
 
-def color_scale(maps: list[ScanMap], log: bool) -> Normalize:
-    """One scale for all scans, so that colors compare between them."""
+def color_scale(maps: list[ScanMap], log: bool, vmax: float | None = None) -> Normalize:
+    """One scale for all scans, so that colors compare between them.
+
+    It ends at MEAN_FACTOR times the mean, not at the maximum: a few hot points would otherwise leave
+    the rest of the map in one color. Points above it take the brightest color.
+    """
     values = np.concatenate([m.values.ravel() for m in maps])
+    top = vmax if vmax is not None else min(MEAN_FACTOR * np.nanmean(values), np.nanmax(values))
     if not log:
-        return Normalize(vmin=np.nanmin(values), vmax=np.nanmax(values))
+        return Normalize(vmin=np.nanmin(values), vmax=top)
     positive = values[values > 0]
     if positive.size == 0:
         raise SystemExit("--log needs at least one count above zero")
-    return LogNorm(vmin=positive.min(), vmax=positive.max())
+    return LogNorm(vmin=positive.min(), vmax=top if top > positive.min() else positive.max())
 
 
 def shown_values(values: np.ndarray, norm: Normalize) -> np.ndarray:
@@ -154,6 +162,11 @@ def main() -> None:
     parser.add_argument(
         "--log", action="store_true", help="log color scale; zero counts take its lowest color"
     )
+    parser.add_argument(
+        "--vmax",
+        type=float,
+        help=f"top of the color scale (default: {MEAN_FACTOR} times the mean of the scans)",
+    )
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
     args = parser.parse_args()
 
@@ -165,9 +178,13 @@ def main() -> None:
             print(f"Scan {run}: {scan.command}")
             maps.append(scan_map(scan, args.counter, args.x, args.y))
             value, x, y = maps[-1].peak()
-            print(f"  max {args.counter} = {value:g} at {args.x} = {x:g}, {args.y} = {y:g}")
+            mean = np.nanmean(maps[-1].values)
+            print(
+                f"  mean {args.counter} = {mean:.4g}, "
+                f"max {args.counter} = {value:g} at {args.x} = {x:g}, {args.y} = {y:g}"
+            )
 
-    norm = color_scale(maps, args.log)
+    norm = color_scale(maps, args.log, args.vmax)
     x_span = max(m.x_edges.max() for m in maps) - min(m.x_edges.min() for m in maps)
     y_span = max(m.y_edges.max() for m in maps) - min(m.y_edges.min() for m in maps)
     fig, ax = plt.subplots(1, 1, figsize=figure_size(x_span, y_span), layout="constrained")
@@ -214,8 +231,18 @@ def main() -> None:
     ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xlabel(args.x, fontsize=14)
     ax.set_ylabel(args.y, fontsize=14)
-    ax.tick_params(direction="out", length=6, width=border_width, labelsize=12)
-    fig.colorbar(mesh, ax=ax, label=f"{args.counter} [counts]")
+    # outward: ticks inside would vanish on the dark cells
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(which="major", direction="out", length=7, width=border_width, labelsize=12)
+    ax.tick_params(which="minor", direction="out", length=4, width=border_width / 2)
+    # beside the axes, so that it keeps their height when equal units shorten them
+    colorbar_axes = make_axes_locatable(ax).append_axes("right", size=0.3, pad=0.15)
+    colorbar = fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]")
+    colorbar.outline.set_linewidth(border_width)
+    colorbar.ax.minorticks_on()
+    colorbar.ax.tick_params(which="major", direction="out", length=6, width=border_width / 1.3)
+    colorbar.ax.tick_params(which="minor", direction="out", length=3.5, width=border_width / 2)
     if several or any(np.isnan(m.values).any() for m in maps):
         legend_handles.append(
             Patch(

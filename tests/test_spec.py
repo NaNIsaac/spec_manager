@@ -226,6 +226,18 @@ def test_a_log_scale_shows_zero_counts_but_keeps_unmeasured_points_empty():
         color_scale([ScanMap(1, np.arange(2.0), np.arange(2.0), np.zeros((1, 1)))], log=True)
 
 
+def test_the_color_scale_follows_the_mean_not_a_hot_point():
+    from splotter.mesh_map import ScanMap, color_scale
+
+    values = np.ones((10, 10)) * 100.0
+    values[0, 0] = 1e6
+    m = ScanMap("1", np.arange(11.0), np.arange(11.0), values)
+    mean = values.mean()
+    assert color_scale([m], log=False).vmax == pytest.approx(10 * mean)
+    assert color_scale([m], log=True).vmax == pytest.approx(10 * mean)
+    assert color_scale([m], log=True, vmax=500).vmax == 500
+
+
 def test_the_figure_takes_the_shape_of_the_map():
     from splotter.mesh_map import figure_size
 
