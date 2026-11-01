@@ -394,6 +394,16 @@ def test_scan_info_scans_picks_the_listed_runs_in_one_read(tmp_path, monkeypatch
         run_script("info", [spec_file, "--scans", 7], monkeypatch)
 
 
+def test_scan_info_output_fits_the_terminal_width(tmp_path, monkeypatch, capsys):
+    spec_file = write_spec(tmp_path / "s.spec", [12])
+    for columns in (60, 100):
+        monkeypatch.setenv("COLUMNS", str(columns))
+        for options in ([], [12], [12, 0]):
+            run_script("info", [spec_file, *options], monkeypatch)
+            lines = capsys.readouterr().out.splitlines()
+            assert max(map(len, lines)) <= columns, (columns, options)
+
+
 def test_scan_info_names_lists_what_columns_accepts(tmp_path, monkeypatch, capsys):
     spec_file = write_spec(tmp_path / "s.spec", [12])
     run_script("info", [spec_file, 12, "--names"], monkeypatch)
@@ -452,4 +462,4 @@ def test_the_command_lists_its_subcommands(capsys):
 
 def test_the_command_reports_its_version(capsys):
     main(["--version"])
-    assert capsys.readouterr().out.strip() == "0.1.1"
+    assert capsys.readouterr().out.strip() == "0.1.2"

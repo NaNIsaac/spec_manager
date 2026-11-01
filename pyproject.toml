@@ -1,6 +1,6 @@
 [project]
 name = "splotter"
-version = "0.1.1"
+version = "0.1.2"
 description = "Read SPEC scan files from the command line: scan lists, point values, metadata and mesh maps"
 readme = "README.md"
 license = "MIT"

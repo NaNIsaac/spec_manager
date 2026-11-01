@@ -26,19 +26,22 @@ Last point: 2026-01-01 09:08:20
 Points: 441
 
 Motors at the start of the scan:
-   Delta = 50.9             Theta = 25.45              Chi = 90                 Phi = 0
-      Mu = 0                Gamma = 0             Sample_X = -1            Sample_Y = -1
+   Delta = 50.9       Theta = 25.45        Chi = 90           Phi = 0
+      Mu = 0          Gamma = 0       Sample_X = -1      Sample_Y = -1
 
 Counters over the scan:
-            min      max         mean  max_point
-Epoch      62.0    502.0   282.000000        440
-Seconds     0.5      0.5     0.500000          0
-imtot    1104.0  97699.0  2103.231293        301
-imroi1      0.0   1957.0    18.716553        301
-imroi2      0.0   4976.0    50.623583        301
-imroi3    525.0  90149.0  1434.022676        301
-immax     118.0    465.0   157.142857        301
+          min    max     mean max_point
+Epoch      62    502      282       440
+Seconds   0.5    0.5      0.5         0
+imtot    1104  97699  2103.23       301
+imroi1      0   1957  18.7166       301
+imroi2      0   4976  50.6236       301
+imroi3    525  90149  1434.02       301
+immax     118    465  157.143       301
 ```
+
+The motors and counters fill as many columns as the terminal is wide, so no line wraps. In the scan
+list, a command longer than the terminal is cut short with `…`.
 
 ## One point
 

@@ -1,4 +1,5 @@
 import argparse
+import shutil
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,16 +9,25 @@ import pandas as pd
 
 from splotter.spec import Spec, SpecScan, find_name, run_id, scan_or_exit
 
-CELLS_PER_ROW = 4
 TIME = "time"  # for --columns: not a SPEC column, computed from Epoch and #D
+CELL_GAP = 3
+
+
+def terminal_width() -> int:
+    return shutil.get_terminal_size((80, 24)).columns
 
 
 def value_grid(values: dict[str, float]) -> str:
-    """name = value cells in rows, so that a hundred motors fit on one screen."""
-    width = max(map(len, values), default=0)
-    cells = [f"{name:>{width}} = {value:<12g}" for name, value in values.items()]
-    rows = [cells[i : i + CELLS_PER_ROW] for i in range(0, len(cells), CELLS_PER_ROW)]
-    return "\n".join("  ".join(row).rstrip() for row in rows)
+    """name = value cells in as many columns as the terminal is wide, so that a hundred motors
+    fit on one screen and a line is never wrapped."""
+    shown = {name: f"{value:.8g}" for name, value in values.items()}
+    name_width = max(map(len, shown), default=0)
+    value_width = max(map(len, shown.values()), default=0)
+    cell_width = name_width + 3 + value_width
+    per_row = max(1, (terminal_width() + CELL_GAP) // (cell_width + CELL_GAP))
+    cells = [f"{name:>{name_width}} = {value:<{value_width}}" for name, value in shown.items()]
+    rows = [cells[i : i + per_row] for i in range(0, len(cells), per_row)]
+    return "\n".join((" " * CELL_GAP).join(row).rstrip() for row in rows)
 
 
 def point_values(
@@ -98,13 +108,22 @@ def print_table(table: pd.DataFrame, csv: bool) -> None:
 
 
 def print_scan_list(scans: list[SpecScan]) -> None:
-    print(f"{'scan':>5}  {'start':<19}  {'duration':>8}  {'points':>6}  command")
+    """One line per scan; a command that would wrap the line is cut short with an ellipsis."""
+    labels = max((len(scan.label) for scan in scans), default=0)
+    label_width = max(labels, len("scan"))
+    prefix = f"{'scan':>{label_width}}  {'start':<19}  {'duration':>8}  {'points':>6}  "
+    print(prefix + "command")
+    room = max(terminal_width() - len(prefix) - 1, 10)
     for scan in scans:
         df = scan.to_dataframe()
         end = point_time(scan, df, -1)
         duration = str(end - scan.time) if end else "-"
+        command = " ".join(scan.command.split())
+        if len(command) > room:
+            command = command[: room - 1] + "…"
         print(
-            f"{scan.label:>5}  {scan.time:%Y-%m-%d %H:%M:%S}  {duration:>8}  {len(df):>6}  {scan.command}"
+            f"{scan.label:>{label_width}}  {scan.time:%Y-%m-%d %H:%M:%S}  {duration:>8}  "
+            f"{len(df):>6}  {command}"
         )
 
 
@@ -218,7 +237,8 @@ def main() -> None:
                 ["min", "max", "mean"]
             )
             summary = summary.T.assign(max_point=df.idxmax(numeric_only=True))
-            print(f"\nCounters over the scan:\n{summary.to_string()}")
+            summary = summary.astype(object).map(lambda value: f"{value:.6g}")
+            print(f"\nCounters over the scan:\n{summary.to_string(line_width=None)}")
     else:
         motors, counters = point_values(scan.motors, df, args.point)
         print(f"\nTime at point {args.point}: {point_time(scan, df, args.point) or '-'}")

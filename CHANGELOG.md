@@ -4,7 +4,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.1.2] - 2026-11-02
+
+### Changed
+
+- `splotter info` fits the terminal: motors and counters fill as many columns as the terminal is
+  wide instead of four, a command too long for the scan list is cut short with `…`, and the counter
+  summary prints compact numbers (`2103.23`, not `2103.231293`).
 
 ### Added
 

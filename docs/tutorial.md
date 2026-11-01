@@ -48,12 +48,12 @@ splotter info tutorial.spec 1 301
 Time at point 301: 2026-01-01 09:06:01
 
 Motors at point 301:
-   Delta = 50.9             Theta = 25.45              Chi = 90                 Phi = 0
-      Mu = 0                Gamma = 0             Sample_X = 0.4           Sample_Y = -0.3
+   Delta = 50.9       Theta = 25.45        Chi = 90           Phi = 0
+      Mu = 0          Gamma = 0       Sample_X = 0.4     Sample_Y = -0.3
 
 Counters at point 301:
-  Epoch = 363           Seconds = 0.5             imtot = 97699          imroi1 = 1957
- imroi2 = 4976           imroi3 = 90149           immax = 465
+  Epoch = 363     Seconds = 0.5       imtot = 97699    imroi1 = 1957
+ imroi2 = 4976     imroi3 = 90149     immax = 465
 ```
 
 Finally, put the meshes and the line scans through the spot on one map. Runs given later are drawn
