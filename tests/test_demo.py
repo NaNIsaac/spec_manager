@@ -71,7 +71,7 @@ def test_every_command_runs_on_it(tmp_path, demo, monkeypatch, capsys):
     run(monkeypatch, "info", demo, 1, "-c", "Sample_X", "Sample_Y", "--top", 1)
     run(monkeypatch, "info", demo, 1, "--meta")
     run(monkeypatch, "mesh", demo, 1, 2, 5, 3, 4, "--log", "--save", tmp_path / "mesh.png")
-    run(monkeypatch, "probe", demo, 1, "--show", "Sample_X", "imroi1")
+    run(monkeypatch, "probe", demo, 1, 2, 5, 3, 4, "--log", "--show", "Sample_X", "imroi1")
     run(monkeypatch, "rock", demo, 6, 7, 8, "--counter", "imroi3", "--save", tmp_path / "rock.png")
     run(monkeypatch, "gamdel", demo, 6, 7, 8)
     scan_list = tmp_path / "demo_fwhm.csv"

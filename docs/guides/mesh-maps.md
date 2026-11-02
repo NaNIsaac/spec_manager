@@ -44,21 +44,22 @@ Names match without regard to case, spaces and underscores. Files before 2015 us
 
 ## Looking at one cell
 
-`splotter probe` draws the map of one scan in a window you can point at. It takes a single run number
-and its own options, apart from `splotter mesh`:
+`splotter probe` draws the same map as `splotter mesh`, with the same arguments, in a window you can
+point at:
 
 ```
-splotter probe demo.spec 1
+splotter probe demo.spec 1 2 5 3 4 --log
 splotter probe demo.spec 1 --counter imroi3 --show Sample_X Sample_Y imroi3 immax
 ```
 
-- **Hover** over a cell: the panel at the left of the map lists the point number, the time,
+- **Hover** over a cell: the panel at the left of the map lists the scan, the point number, the time,
   `Sample_X` and `Sample_Y` as measured at that point, and the counters. The point number is the one
   `splotter info demo.spec 1 301` takes. The panel stays where it is, so the window never changes
   shape.
 - **Click** a cell: it stays outlined in cyan, the panel keeps listing it while the mouse is off the
   map, and the terminal prints every motor and counter recorded at that point, as `splotter info`
   does for a point.
+- Where scans overlap, the panel lists the one drawn on top, the run given later.
 - Cells that were not measured show nothing.
 
 | Option | Effect |
@@ -66,9 +67,10 @@ splotter probe demo.spec 1 --counter imroi3 --show Sample_X Sample_Y imroi3 imma
 | `--counter NAME` | The counter that gives the colors (default `imtot`) |
 | `--show NAME ...` | What the panel lists besides the two axes (default: every counter) |
 | `--x NAME`, `--y NAME` | The motors of the axes (default `Sample_X`, `Sample_Y`) |
-| `--log`, `--vmax VALUE` | As for `splotter mesh` |
+| `--log`, `--vmax VALUE` | As for `splotter mesh`, as is the color scale of several scans |
 
-It has no `--save`, as a picture holds no mouse; use `splotter mesh --save` for that.
+It has no `--save`, as a picture holds no mouse; use `splotter mesh --save` for that. The legend of
+several scans is at the bottom left, under the panel.
 
 ## Limits
 

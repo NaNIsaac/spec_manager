@@ -26,6 +26,13 @@ OUTLINE_STYLES = ["solid", "dashed", "dashdot", "dotted"]
 # a thin dark edge keeps them on the gray fill
 OUTLINE_HALO = [Stroke(linewidth=1.8, foreground="black", alpha=0.5), Normal()]
 MEAN_FACTOR = 10  # the color scale ends at this many times the mean
+LEGEND_STYLE = {
+    "facecolor": LEGEND_FILL,
+    "edgecolor": LEGEND_FILL,
+    "framealpha": 1,
+    "labelcolor": "white",
+}
+BORDER_WIDTH = 2.0
 # inches
 MAX_MAP_SIDE, MIN_MAP_SIDE = 6.0, 2.5
 COLORBAR_AND_LABELS, TITLE_AND_LABELS = 2.2, 1.6
@@ -160,45 +167,33 @@ def figure_size(x_span: float, y_span: float) -> tuple[float, float]:
     return width + COLORBAR_AND_LABELS, height + TITLE_AND_LABELS
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Map of one counter over the motor positions of SPEC mesh and line scans. "
-        "Several scans share the axes and the color scale; later runs draw over earlier ones."
-    )
-    parser.add_argument("spec_file", type=Path)
-    parser.add_argument("scans", type=run_id, nargs="+", help="mesh, ascan or dscan run numbers")
-    parser.add_argument("--counter", default="imtot", help="e.g. imtot, imroi1, imroi2, immax")
-    parser.add_argument("--x", default="Sample_X", help="motor of the horizontal axis")
-    parser.add_argument("--y", default="Sample_Y", help="motor of the vertical axis")
-    parser.add_argument(
-        "--log", action="store_true", help="log color scale; zero counts take its lowest color"
-    )
-    parser.add_argument(
-        "--vmax",
-        type=float,
-        help=f"top of the color scale (default: {MEAN_FACTOR} times the mean of the scans)",
-    )
-    parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
-    args = parser.parse_args()
-
-    print(f"Load spec file: '{args.spec_file}'")
-    maps = []
-    with Spec(args.spec_file) as spec:
-        for run in args.scans:
+def load_maps(spec_file: Path, runs: list[str], counter: str, x: str, y: str):
+    """The scans of the runs and their maps; prints each command, mean and peak."""
+    print(f"Load spec file: '{spec_file}'")
+    scans, maps = [], []
+    with Spec(spec_file) as spec:
+        for run in runs:
             scan = scan_or_exit(spec, run)
             print(f"Scan {run}: {scan.command}")
-            maps.append(scan_map(scan, args.counter, args.x, args.y))
-            value, x, y = maps[-1].peak()
+            maps.append(scan_map(scan, counter, x, y))
+            scans.append(scan)
+            value, peak_x, peak_y = maps[-1].peak()
             mean = np.nanmean(maps[-1].values)
             print(
-                f"  mean {args.counter} = {mean:.4g}, "
-                f"max {args.counter} = {value:g} at {args.x} = {x:g}, {args.y} = {y:g}"
+                f"  mean {counter} = {mean:.4g}, "
+                f"max {counter} = {value:g} at {x} = {peak_x:g}, {y} = {peak_y:g}"
             )
+    return scans, maps
 
-    norm = color_scale(maps, args.log, args.vmax)
+
+def map_spans(maps: list[ScanMap]) -> tuple[float, float]:
     x_span = max(m.x_edges.max() for m in maps) - min(m.x_edges.min() for m in maps)
     y_span = max(m.y_edges.max() for m in maps) - min(m.y_edges.min() for m in maps)
-    fig, ax = plt.subplots(1, 1, figsize=figure_size(x_span, y_span), layout="constrained")
+    return x_span, y_span
+
+
+def draw_maps(ax, maps: list[ScanMap], norm: Normalize):
+    """The maps on the axes, later ones on top; returns the last mesh and the legend entries."""
     ax.patch.set(facecolor=NOT_MEASURED_FILL, edgecolor=NOT_MEASURED_HATCH, hatch="///")
     several = len(maps) > 1
     legend_handles = []
@@ -232,28 +227,6 @@ def main() -> None:
     # the vertical axis runs downward: smaller numbers at the top
     ax.set_ylim(max(m.y_edges.max() for m in maps), min(m.y_edges.min() for m in maps))
     ax.set_aspect("equal")
-
-    border_width = 2.0
-    for side in ["top", "bottom", "left", "right"]:
-        ax.spines[side].set_linewidth(border_width)
-
-    runs = ", ".join(str(m.run) for m in maps)
-    title = f"Scan{'s' if several else ''} {runs}: {args.counter}"
-    ax.set_title(title, fontsize=14, fontweight="bold")
-    ax.set_xlabel(args.x, fontsize=14)
-    ax.set_ylabel(args.y, fontsize=14)
-    # outward: ticks inside would vanish on the dark cells
-    ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.yaxis.set_minor_locator(AutoMinorLocator())
-    ax.tick_params(which="major", direction="out", length=7, width=border_width, labelsize=12)
-    ax.tick_params(which="minor", direction="out", length=4, width=border_width / 2)
-    # beside the axes, so that it keeps their height when equal units shorten them
-    colorbar_axes = make_axes_locatable(ax).append_axes("right", size=0.3, pad=0.15)
-    colorbar = fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]")
-    colorbar.outline.set_linewidth(border_width)
-    colorbar.ax.minorticks_on()
-    colorbar.ax.tick_params(which="major", direction="out", length=6, width=border_width / 1.3)
-    colorbar.ax.tick_params(which="minor", direction="out", length=3.5, width=border_width / 2)
     if several or any(np.isnan(m.values).any() for m in maps):
         legend_handles.append(
             Patch(
@@ -263,14 +236,72 @@ def main() -> None:
                 label="not measured",
             )
         )
+    return mesh, legend_handles
+
+
+def style_axes(ax, maps: list[ScanMap], counter: str, x: str, y: str) -> None:
+    for side in ["top", "bottom", "left", "right"]:
+        ax.spines[side].set_linewidth(BORDER_WIDTH)
+    runs = ", ".join(str(m.run) for m in maps)
+    title = f"Scan{'s' if len(maps) > 1 else ''} {runs}: {counter}"
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.set_xlabel(x, fontsize=14)
+    ax.set_ylabel(y, fontsize=14)
+    # outward: ticks inside would vanish on the dark cells
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(which="major", direction="out", length=7, width=BORDER_WIDTH, labelsize=12)
+    ax.tick_params(which="minor", direction="out", length=4, width=BORDER_WIDTH / 2)
+
+
+def style_colorbar(colorbar) -> None:
+    colorbar.outline.set_linewidth(BORDER_WIDTH)
+    colorbar.ax.minorticks_on()
+    colorbar.ax.tick_params(which="major", direction="out", length=6, width=BORDER_WIDTH / 1.3)
+    colorbar.ax.tick_params(which="minor", direction="out", length=3.5, width=BORDER_WIDTH / 2)
+
+
+def add_map_arguments(parser: argparse.ArgumentParser) -> None:
+    """The arguments of splotter mesh, which splotter probe takes as well."""
+    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("scans", type=run_id, nargs="+", help="mesh, ascan or dscan run numbers")
+    parser.add_argument("--counter", default="imtot", help="e.g. imtot, imroi1, imroi2, immax")
+    parser.add_argument("--x", default="Sample_X", help="motor of the horizontal axis")
+    parser.add_argument("--y", default="Sample_Y", help="motor of the vertical axis")
+    parser.add_argument(
+        "--log", action="store_true", help="log color scale; zero counts take its lowest color"
+    )
+    parser.add_argument(
+        "--vmax",
+        type=float,
+        help=f"top of the color scale (default: {MEAN_FACTOR} times the mean of the scans)",
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Map of one counter over the motor positions of SPEC mesh and line scans. "
+        "Several scans share the axes and the color scale; later runs draw over earlier ones."
+    )
+    add_map_arguments(parser)
+    parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
+    args = parser.parse_args()
+
+    _, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
+    norm = color_scale(maps, args.log, args.vmax)
+    fig, ax = plt.subplots(1, 1, figsize=figure_size(*map_spans(maps)), layout="constrained")
+    mesh, legend_handles = draw_maps(ax, maps, norm)
+    style_axes(ax, maps, args.counter, args.x, args.y)
+    # beside the axes, so that it keeps their height when equal units shorten them
+    colorbar_axes = make_axes_locatable(ax).append_axes("right", size=0.3, pad=0.15)
+    colorbar = fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]")
+    style_colorbar(colorbar)
+    if legend_handles:
         fig.legend(
             handles=legend_handles,
             loc="outside lower center",
             ncols=min(len(legend_handles), 3),
-            facecolor=LEGEND_FILL,
-            edgecolor=LEGEND_FILL,
-            framealpha=1,
-            labelcolor="white",
+            **LEGEND_STYLE,
         )
 
     if args.save:

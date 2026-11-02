@@ -47,7 +47,7 @@ splotter info FILE 2032 669                  # time, motors and counters of one 
 splotter info FILE 2032 -c imtot Sample_X    # values by column name
 splotter info FILE 2032 --meta               # #T, #Q, #R lines and #UXML metadata
 splotter mesh FILE 2032 2036 --log           # map of several scans
-splotter probe FILE 2614                     # mesh map: hover a cell for its values, click to print them
+splotter probe FILE 2614 2616 --log          # the same map: hover a cell for its values, click to print them
 splotter rock FILE 2033 --counter imroi1     # rocking curve
 ```
 

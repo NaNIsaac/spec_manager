@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,19 +6,21 @@ from matplotlib.patches import Rectangle
 
 from splotter.mesh_map import (
     COLORBAR_AND_LABELS,
-    MEAN_FACTOR,
-    NOT_MEASURED_FILL,
-    NOT_MEASURED_HATCH,
+    LEGEND_STYLE,
     TITLE_AND_LABELS,
     ScanMap,
+    add_map_arguments,
     color_scale,
+    draw_maps,
     figure_size,
+    load_maps,
+    map_spans,
     point_map,
-    scan_map,
-    shown_values,
+    style_axes,
+    style_colorbar,
 )
 from splotter.scan_info import point_time, point_values, value_grid
-from splotter.spec import Spec, SpecScan, find_name, run_id, scan_or_exit
+from splotter.spec import SpecScan, find_name
 
 HOVER_COLOR, PIN_COLOR = "#e8e8e8", "#6fc7d6"
 HINT = "hover over a cell\nfor its values,\nclick to keep it"
@@ -98,16 +99,41 @@ class Probe:
         )
 
 
+class Probes:
+    """The Probe of each scan; a cell is (scan index, ix, iy). Scans drawn later lie on top."""
+
+    def __init__(self, probes: list[Probe]):
+        self.probes = probes
+
+    def cell_at(self, x: float, y: float) -> tuple[int, int, int] | None:
+        for i in reversed(range(len(self.probes))):
+            cell = self.probes[i].cell_at(x, y)
+            if cell is not None:
+                return i, *cell
+        return None
+
+    def bounds(self, cell: tuple[int, int, int]) -> tuple[float, float, float, float]:
+        return self.probes[cell[0]].bounds(cell[1:])
+
+    def tooltip(self, cell: tuple[int, int, int]) -> str:
+        probe = self.probes[cell[0]]
+        return f"scan {probe.scan.label}\n" + probe.tooltip(probe.point_of(cell[1:]))
+
+    def report(self, cell: tuple[int, int, int]) -> str:
+        probe = self.probes[cell[0]]
+        return probe.report(probe.point_of(cell[1:]))
+
+
 class InfoPanel:
     """Marks the cells of a Probe on a map and lists their values in a fixed panel beside it.
 
     The panel does not move or resize with the mouse, so the window keeps its shape.
     """
 
-    def __init__(self, fig, ax, probe: Probe):
+    def __init__(self, fig, ax, probe: Probes):
         self.fig, self.ax, self.probe = fig, ax, probe
-        self.hovered: tuple[int, int] | None = None
-        self.pinned: tuple[int, int] | None = None
+        self.hovered: tuple[int, int, int] | None = None
+        self.pinned: tuple[int, int, int] | None = None
         self.hover_mark = self.mark(HOVER_COLOR, linewidth=1.5, zorder=4)
         self.pin_mark = self.mark(PIN_COLOR, linewidth=2.5, zorder=5)
         self.text = fig.text(
@@ -132,7 +158,7 @@ class InfoPanel:
         self.ax.add_patch(rectangle)
         return rectangle
 
-    def place(self, rectangle: Rectangle, cell: tuple[int, int] | None) -> None:
+    def place(self, rectangle: Rectangle, cell: tuple[int, int, int] | None) -> None:
         rectangle.set_visible(cell is not None)
         if cell is not None:
             left, bottom, width, height = self.probe.bounds(cell)
@@ -141,7 +167,7 @@ class InfoPanel:
     def refresh(self) -> None:
         """The hovered cell is listed; with none, the clicked one; with none, the hint."""
         cell = self.hovered or self.pinned
-        self.text.set_text(HINT if cell is None else self.probe.tooltip(self.probe.point_of(cell)))
+        self.text.set_text(HINT if cell is None else self.probe.tooltip(cell))
         self.fig.canvas.draw_idle()
 
     def on_move(self, event) -> None:
@@ -161,7 +187,7 @@ class InfoPanel:
             return
         self.pinned = cell
         self.place(self.pin_mark, cell)
-        print(f"\n{self.probe.report(self.probe.point_of(cell))}")
+        print(f"\n{self.probe.report(cell)}")
         self.refresh()
 
     def on_leave(self, _event) -> None:
@@ -171,17 +197,17 @@ class InfoPanel:
             self.refresh()
 
 
-def draw(scan: SpecScan, args) -> tuple:
-    """Figure of the scan's map with an InfoPanel on it; the panel must stay referenced."""
-    grid = scan_map(scan, args.counter, args.x, args.y)
-    probe = Probe(scan, grid, point_map(scan, args.x, args.y), args.x, args.y, args.show)
+def draw(scans: list[SpecScan], maps: list[ScanMap], args) -> tuple:
+    """Figure of the maps with an InfoPanel on it; the panel must stay referenced."""
+    probes = [
+        Probe(scan, grid, point_map(scan, args.x, args.y), args.x, args.y, args.show)
+        for scan, grid in zip(scans, maps, strict=True)
+    ]
     if args.show:
-        probe.values_at(0)  # an unknown name stops here, not on the first hover
-    norm = color_scale([grid], args.log, args.vmax)
-    x_span = grid.x_edges.max() - grid.x_edges.min()
-    y_span = grid.y_edges.max() - grid.y_edges.min()
+        probes[0].values_at(0)  # an unknown name stops here, not on the first hover
+    norm = color_scale(maps, args.log, args.vmax)
     # every part has a place of its own in inches, so that nothing the mouse does can move the map
-    map_width, map_height = figure_size(x_span, y_span)
+    map_width, map_height = figure_size(*map_spans(maps))
     map_width, map_height = map_width - COLORBAR_AND_LABELS, map_height - TITLE_AND_LABELS
     left = PANEL_WIDTH + AXIS_LABEL_ROOM
     total_width = left + map_width + COLORBAR_GAP + COLORBAR_WIDTH + COLORBAR_LABEL_ROOM
@@ -195,50 +221,34 @@ def draw(scan: SpecScan, args) -> tuple:
     colorbar_axes = fig.add_axes(
         inches(left + map_width + COLORBAR_GAP, AXIS_LABEL_ROOM, COLORBAR_WIDTH, map_height)
     )
-    ax.patch.set(facecolor=NOT_MEASURED_FILL, edgecolor=NOT_MEASURED_HATCH, hatch="///")
-    mesh = ax.pcolormesh(
-        grid.x_edges, grid.y_edges, shown_values(grid.values, norm), cmap="magma", norm=norm
-    )
-    ax.set_xlim(grid.x_edges.min(), grid.x_edges.max())
-    # the vertical axis runs downward, as on the mesh map
-    ax.set_ylim(grid.y_edges.max(), grid.y_edges.min())
-    ax.set_aspect("equal")
-    ax.set_title(f"Scan {scan.label}: {args.counter}", fontsize=14, fontweight="bold")
-    ax.set_xlabel(args.x, fontsize=14)
-    ax.set_ylabel(args.y, fontsize=14)
-    fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]")
-    return fig, InfoPanel(fig, ax, probe)
+    mesh, legend_handles = draw_maps(ax, maps, norm)
+    style_axes(ax, maps, args.counter, args.x, args.y)
+    style_colorbar(fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]"))
+    if legend_handles:
+        # under the panel text, in the corner of the window
+        fig.legend(
+            handles=legend_handles, loc="lower left", bbox_to_anchor=(0.005, 0.01), **LEGEND_STYLE
+        )
+    return fig, InfoPanel(fig, ax, Probes(probes))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Mesh or line scan map to point at: hover over a cell and the panel at its left "
-        "lists the point number, motor positions and counters; click to mark the cell and print "
-        "everything recorded there."
+        description="The map of splotter mesh, to point at: hover over a cell and the panel at its "
+        "left lists the scan, point number, motor positions and counters; click to mark the cell "
+        "and print everything recorded there. Where scans overlap, the later run is the one listed."
     )
-    parser.add_argument("spec_file", type=Path)
-    parser.add_argument("scan", type=run_id, help="mesh, ascan or dscan run number")
-    parser.add_argument("--counter", default="imtot", help="counter that gives the colors")
-    parser.add_argument("--x", default="Sample_X", help="motor of the horizontal axis")
-    parser.add_argument("--y", default="Sample_Y", help="motor of the vertical axis")
+    add_map_arguments(parser)
     parser.add_argument(
         "--show",
         nargs="+",
         metavar="NAME",
         help="counters and motors in the panel (default: every counter)",
     )
-    parser.add_argument("--log", action="store_true", help="log color scale")
-    parser.add_argument(
-        "--vmax",
-        type=float,
-        help=f"top of the color scale (default: {MEAN_FACTOR} times the mean of the scan)",
-    )
     args = parser.parse_args()
 
-    with Spec(args.spec_file) as spec:
-        scan = scan_or_exit(spec, args.scan)
-    print(f"Scan {scan.label}: {scan.command}")
-    _fig, _panel = draw(scan, args)
+    scans, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
+    _fig, _panel = draw(scans, maps, args)
     plt.show()
 
 

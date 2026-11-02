@@ -79,15 +79,16 @@ def test_an_unknown_name_to_show_is_refused():
         probe_of(show=["nope"]).values_at(0)
 
 
-def write_mesh_file(tmp_path):
+def load(tmp_path, runs=(1,)):
     path = tmp_path / "s.spec"
     path.write_text("\n".join(header() + mesh_block(1) + scan_block(2)), encoding="utf-8")
     with Spec(path) as spec:
-        return spec.get_scan(1)
+        scans = [spec.get_scan(run) for run in runs]
+    return scans, [scan_map(scan, "imtot", "Sample_X", "Sample_Y") for scan in scans]
 
 
 def test_hover_lists_the_point_in_the_panel_and_click_prints_it(tmp_path, capsys):
-    fig, panel = draw(write_mesh_file(tmp_path), options())
+    fig, panel = draw(*load(tmp_path), options())
     fig.canvas.draw()
     size = tuple(fig.get_size_inches())
     x, y = panel.ax.transData.transform((2.0, 0.5))
@@ -95,7 +96,8 @@ def test_hover_lists_the_point_in_the_panel_and_click_prints_it(tmp_path, capsys
 
     fire(fig, "motion_notify_event", x, y)
     assert panel.hover_mark.get_visible()
-    assert "Sample_X = 2" in panel.text.get_text() and "imtot" in panel.text.get_text()
+    assert "scan 1" in panel.text.get_text() and "Sample_X = 2" in panel.text.get_text()
+    assert "imtot" in panel.text.get_text()
 
     fire(fig, "button_press_event", x, y, button=1)
     printed = capsys.readouterr().out
@@ -105,3 +107,11 @@ def test_hover_lists_the_point_in_the_panel_and_click_prints_it(tmp_path, capsys
     assert not panel.hover_mark.get_visible()
     assert "Sample_X = 2" in panel.text.get_text()  # the clicked cell stays listed
     assert tuple(fig.get_size_inches()) == size
+
+
+def test_where_scans_overlap_the_one_drawn_later_is_listed(tmp_path):
+    scans, maps = load(tmp_path, runs=(1, 1))
+    fig, panel = draw(scans, maps, options())
+    fig.canvas.draw()
+    fire(fig, "motion_notify_event", *panel.ax.transData.transform((2.0, 0.5)))
+    assert panel.hovered[0] == 1
