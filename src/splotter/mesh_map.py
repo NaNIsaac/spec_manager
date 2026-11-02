@@ -75,8 +75,19 @@ def scan_map(scan: SpecScan, counter: str, x: str, y: str) -> ScanMap:
     column = find_name(counter, df.columns)
     if not column:
         raise SystemExit(f"no counter '{counter}'; columns: {', '.join(df.columns)}")
+    return place_values(scan, df, df[column].to_numpy(dtype=float), x, y)
 
-    measured = df[column].to_numpy(dtype=float)
+
+def point_map(scan: SpecScan, x: str, y: str) -> ScanMap:
+    """The same cells as scan_map, holding the number of the data row measured there."""
+    df = scan.to_dataframe()
+    if df.empty:
+        raise SystemExit(f"scan {scan.label} has no data")
+    return place_values(scan, df, np.arange(len(df), dtype=float), x, y)
+
+
+def place_values(scan: SpecScan, df, measured: np.ndarray, x: str, y: str) -> ScanMap:
+    """Put one value per data row of the scan on the cell where the row was measured."""
     x_key, y_key = name_key(x), name_key(y)
     tokens = scan.command.split()
     if "mesh" in tokens[0]:

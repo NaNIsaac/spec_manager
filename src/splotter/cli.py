@@ -7,6 +7,7 @@ from importlib.metadata import version
 COMMANDS = {
     "info": ("splotter.scan_info", "scan list, point values, metadata, values by column name"),
     "mesh": ("splotter.mesh_map", "map of a counter over two motors, from one or several scans"),
+    "probe": ("splotter.probe", "mesh map of one scan to hover or click for the values of a cell"),
     "rock": ("splotter.rocking_curve", "normalized rocking curves on a log scale"),
     "gamdel": ("splotter.gam_del", "measured gamma/delta against the arc of one 2theta"),
     "fwhm": ("splotter.fwhm_vs_q", "Gaussian FWHM of rocking scans against Q"),

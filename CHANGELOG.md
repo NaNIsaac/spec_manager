@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-11-03
+
+### Added
+
+- `splotter probe FILE RUN`: the map of one scan, where hovering over a cell lists its point number,
+  time, motor positions and counters in a fixed panel at the left, and clicking it prints everything
+  recorded at that point.
+
 ## [0.1.2] - 2026-11-02
 
 ### Changed

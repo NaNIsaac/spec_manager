@@ -462,4 +462,4 @@ def test_the_command_lists_its_subcommands(capsys):
 
 def test_the_command_reports_its_version(capsys):
     main(["--version"])
-    assert capsys.readouterr().out.strip() == "0.1.2"
+    assert capsys.readouterr().out.strip() == "0.1.3"
