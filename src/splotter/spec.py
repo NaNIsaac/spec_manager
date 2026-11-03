@@ -282,6 +282,11 @@ class Spec:
             header_row = HEADER_ROW.match(line)
             if line.startswith(("#F ", "#E ")) or header_row:
                 current_scan = None
+            if line.startswith(("#F ", "#E ")):
+                # a new session may lack a row the old one had; it must not inherit that row
+                for kind, names in rows.items():
+                    if names:
+                        rows[kind] = []
 
             if current_scan is None:
                 if header_row:

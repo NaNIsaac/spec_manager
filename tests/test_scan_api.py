@@ -273,3 +273,37 @@ def test_a_short_p_line_is_reported(tmp_path):
         "#P has 4 values for 6 motor names; the motor values are paired in order and may be wrong"
     ]
     assert spec.get_scan(3).warnings == []
+
+
+def test_a_restart_without_mnemonics_does_not_inherit_the_old_ones(tmp_path):
+    # the new session has as many motors as the old one, so stale #o rows would pair up silently
+    restart = """
+#F manual.spec
+#E 1000007200
+#D Wed Feb 17 21:22:16 1994
+#O0 M1  M2  M3  M4
+#O1 M5  M6
+
+#S 9 ascan  M5 0 1  1 1
+#D Wed Feb 17 21:30:00 1994
+#P0 1 2 3 4
+#P1 5 6
+#N 2
+#L M5  Detector
+0 1
+1 2
+"""
+    path = tmp_path / "mixed.spec"
+    path.write_text(HEADER + SCANS + restart, encoding="utf-8")
+    with Spec(path) as spec:
+        old, new = spec.get_scan(1), spec.get_scan(9)
+    assert old.motor_table.resolve("sx") == "Sample_X"
+    assert (new.motor_mnemonics, new.counter_names, new.counter_mnemonics) == ([], [], [])
+    assert not new.motor_table.paired
+    assert "sx" not in new and new["M6"] == 6
+    assert new.axes == ("M5",)
+
+
+def test_hklmesh_takes_lower_case_coordinates():
+    command = ScanCommand.parse("hklmesh h 0.9 1.1 2 l 0 0.2 2 1")
+    assert command.known and [a.name for a in command.axes] == ["H", "L"]

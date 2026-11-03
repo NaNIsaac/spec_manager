@@ -115,7 +115,9 @@ def _parse(text: str, kind: str, args: list[str]) -> ScanCommand:
         )
     if kind == "hklmesh":
         _expect(args, 9)
-        axes = (_axis(args[0:3]), _axis(args[4:7]))
+        axes = tuple(
+            Axis(a.name.upper(), a.start, a.stop) for a in (_axis(args[0:3]), _axis(args[4:7]))
+        )
         if {axes[0].name, axes[1].name} - set("HKL") or axes[0].name == axes[1].name:
             raise ValueError("hklmesh scans two different ones of H, K and L")
         intervals = (int(args[3]), int(args[7]))
