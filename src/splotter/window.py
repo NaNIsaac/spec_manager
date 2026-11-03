@@ -24,6 +24,8 @@ from matplotlib.backends import BackendFilter, backend_registry
 # Long enough to catch a child that cannot start (no display, a broken install), short enough
 # not to be noticed; a later failure is in the log.
 EARLY_EXIT_SECONDS = 0.5
+# A child holds its log open while the window is up, so logs are pruned by age, not at exit.
+KEEP_LOGS_SECONDS = 7 * 24 * 3600
 # Set for the child of a window that prints: the terminal already has its start-up lines.
 QUIET_UNTIL_SHOWN = "SPLOTTER_QUIET_UNTIL_SHOWN"
 _terminal = None
@@ -69,6 +71,16 @@ def detach_options(prints: bool = False) -> dict:
     return {"start_new_session": True}
 
 
+def prune_logs(folder: Path, now: float) -> None:
+    """Remove the logs of windows started more than a week ago; one still open stays."""
+    for log in folder.glob("splotter-*.log"):
+        try:
+            if now - log.stat().st_mtime > KEEP_LOGS_SECONDS:
+                log.unlink()
+        except OSError:
+            continue
+
+
 def show(args: argparse.Namespace, module: str, *, prints: bool = False) -> None:
     """Show the figures of ``module``'s command, in a detached process unless ``--wait``.
 
@@ -88,7 +100,9 @@ def show(args: argparse.Namespace, module: str, *, prints: bool = False) -> None
         env = os.environ | {QUIET_UNTIL_SHOWN: "1"}
         child = subprocess.Popen(command, stdin=subprocess.DEVNULL, env=env, **options)
     else:
-        log = Path(tempfile.gettempdir()) / f"splotter-{os.getpid()}-{time.time_ns()}.log"
+        folder = Path(tempfile.gettempdir())
+        prune_logs(folder, time.time())
+        log = folder / f"splotter-{os.getpid()}-{time.time_ns()}.log"
         with log.open("wb") as out:
             child = subprocess.Popen(
                 command, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, **options

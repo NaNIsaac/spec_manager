@@ -141,3 +141,19 @@ def test_the_child_command_runs(demo):
         command, check=False, env=env, capture_output=True, text=True, timeout=120
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_logs_older_than_a_week_are_removed_when_a_window_opens(monkeypatch, spawned, tmp_path):
+    monkeypatch.setattr(window.tempfile, "gettempdir", lambda: str(tmp_path))
+    old, recent = tmp_path / "splotter-1-1.log", tmp_path / "splotter-2-2.log"
+    other = tmp_path / "other.log"
+    for path in (old, recent, other):
+        path.write_text("x")
+    week_ago = window.time.time() - window.KEEP_LOGS_SECONDS - 60
+    os.utime(old, (week_ago, week_ago))
+    os.utime(other, (week_ago, week_ago))
+    monkeypatch.setattr(sys, "argv", ["splotter mesh", "demo.spec", "1"])
+    window.show(window.argparse.Namespace(wait=False), "splotter.mesh_map")
+    assert not old.exists()
+    assert recent.exists() and other.exists()
+    assert len(list(tmp_path.glob("splotter-*.log"))) == 2
