@@ -2,14 +2,21 @@ import argparse
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cached_property
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
+
+from splotter.command import ScanCommand, Space
+from splotter.names import Names, name_key
+from splotter.names import find as find_name
+
+__all__ = ["Spec", "SpecScan", "find_name", "name_key", "run_id", "scan_or_exit"]
 
 NAME_GAP = re.compile(r"\s{2,}|\t")
 
@@ -41,16 +48,7 @@ def data_row(line: str, n_columns: int) -> list[float] | None:
         return None
 
 
-def name_key(name: str) -> str:
-    return re.sub(r"[\s_]", "", name).lower()
-
-
-def find_name(name: str, names: Iterable[str]) -> str | None:
-    """The entry of names meant by name; older files write Sample X where newer ones say Sample_X."""
-    names = list(names)
-    if name in names:
-        return name
-    return next((candidate for candidate in names if name_key(candidate) == name_key(name)), None)
+HEADER_ROW = re.compile(r"#([OoJj])(\d+)(?:\s|$)")
 
 
 def _xml_to_dict(element: ET.Element) -> Any:
@@ -96,6 +94,9 @@ class SpecScan:
     time: datetime = field(default_factory=datetime.now)
     skipped_lines: int = 0  # lines between the data that are not a row of the #L columns
     label: str = ""  # the run number, or 12.2 for the second scan numbered 12
+    motor_mnemonics: list[str] = field(default_factory=list)
+    counter_names: list[str] = field(default_factory=list)
+    counter_mnemonics: list[str] = field(default_factory=list)
     _raw_p_values: list[float] = field(default_factory=list, repr=False)
     _raw_uxml: list[str] = field(default_factory=list, repr=False)
     _uxml_dict: dict[str, Any] | None = field(default=None, repr=False, init=False)
@@ -106,6 +107,97 @@ class SpecScan:
     @property
     def motors(self) -> dict[str, float]:
         return dict(zip(self.motor_names, self._raw_p_values, strict=False))
+
+    @property
+    def positioners_at_start(self) -> dict[str, float]:
+        """Motor positions at the start of the scan (#P), by the names of #O."""
+        return self.motors
+
+    @property
+    def motor_table(self) -> Names:
+        return Names(self.motor_names, self.motor_mnemonics)
+
+    @property
+    def counter_table(self) -> Names:
+        return Names(self.counter_names, self.counter_mnemonics)
+
+    @cached_property
+    def scan_command(self) -> ScanCommand:
+        return ScanCommand.parse(self.command)
+
+    @property
+    def warnings(self) -> list[str]:
+        """What makes values of this scan doubtful; the parser reads on regardless."""
+        out = []
+        if self._raw_p_values and len(self._raw_p_values) != len(self.motor_names):
+            out.append(
+                f"#P has {len(self._raw_p_values)} values for {len(self.motor_names)} motor names; "
+                "the motor values are paired in order and may be wrong"
+            )
+        if self.motor_mnemonics and len(self.motor_mnemonics) != len(self.motor_names):
+            out.append(
+                f"#o has {len(self.motor_mnemonics)} mnemonics for {len(self.motor_names)} motor "
+                "names; mnemonics are not used"
+            )
+        return out
+
+    @property
+    def axes(self) -> tuple[str, ...]:
+        """The #L names of what the command scanned, in its order; () for a command not known.
+
+        A motor typed by a mnemonic needs #o to be found. Without it, the position of the axis in
+        the command is taken as its column, as the standard macros write the scanned motors first.
+        """
+        command = self.scan_command
+        if not command.known:
+            return ()
+        columns = list(self._frame.columns)
+        found = []
+        for i, axis in enumerate(command.axes):
+            if command.space is Space.HKL:
+                name = find_name(axis.name, columns)
+            else:
+                name = self.motor_table.resolve(axis.name, columns)
+                if name is None and i < len(columns):
+                    name = columns[i]
+            if name is None:
+                return ()
+            found.append(name)
+        return tuple(found)
+
+    def __getitem__(self, key: str) -> np.ndarray | float:
+        """A data column as an array, else a motor's start position (#P); by name or mnemonic.
+
+        A motor the scan moved is a column, so this gives its value at every point.
+        """
+        columns = list(self._frame.columns)
+        column = self.motor_table.resolve(key, columns) or self.counter_table.resolve(key, columns)
+        if column is not None:
+            return self._frame[column].to_numpy(dtype=float)
+        motors = self.motors
+        motor = self.motor_table.resolve(key, motors)
+        if motor is not None:
+            return motors[motor]
+        raise KeyError(f"scan {self.label} has no column or motor {key!r}")
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        try:
+            self[key]
+        except KeyError:
+            return False
+        return True
+
+    def at(self, point: int) -> dict[str, float]:
+        """Every motor and column at one data row; a motor the scan moved takes its value there."""
+        row = self._frame.iloc[point].to_dict()
+        motors = {name: row.get(name, value) for name, value in self.motors.items()}
+        return motors | {name: value for name, value in row.items() if name not in motors}
+
+    @cached_property
+    def _frame(self) -> pd.DataFrame:
+        return self.to_dataframe()
 
     @property
     def uxml(self) -> dict[str, Any]:
@@ -162,7 +254,8 @@ class Spec:
 
     def _parse(self, file: TextIOWrapper):
         current_scan = None
-        motors = self.motor_names
+        # motor names, motor mnemonics, counter names, counter mnemonics of the current session
+        rows: dict[str, list[str]] = {"O": self.motor_names, "o": [], "J": [], "j": []}
 
         for line in file:
             line = line.strip()
@@ -173,21 +266,34 @@ class Spec:
                 scan_no = int(parts[1])
                 command = parts[2] if len(parts) > 2 else ""
 
-                current_scan = SpecScan(scan_no=scan_no, command=command, motor_names=motors)
+                current_scan = SpecScan(
+                    scan_no=scan_no,
+                    command=command,
+                    motor_names=rows["O"],
+                    motor_mnemonics=rows["o"],
+                    counter_names=rows["J"],
+                    counter_mnemonics=rows["j"],
+                )
                 self.scans[scan_no] = current_scan
                 self.all_scans.append(current_scan)
                 continue
 
             # a restarted SPEC session writes a new file header between two scans
-            is_motor_line = line.startswith("#O") and line[2:3].isdigit()
-            if line.startswith(("#F ", "#E ")) or is_motor_line:
+            header_row = HEADER_ROW.match(line)
+            if line.startswith(("#F ", "#E ")) or header_row:
                 current_scan = None
 
             if current_scan is None:
-                if is_motor_line:
-                    if line.startswith("#O0") and motors:
-                        motors = []
-                    motors.extend(split_names(line[line.find(" ") + 1 :]))
+                if header_row:
+                    kind, number = header_row.groups()
+                    if number == "0" and rows[kind]:
+                        rows[kind] = []
+                    text = line[header_row.end() :]
+                    # names may hold one space (Sample X); mnemonics never do
+                    rows[kind].extend(split_names(text) if kind in "OJ" else text.split())
+                    if kind != "O" and not self.all_scans:
+                        tag = line.split(" ", 1)[0]
+                        self.file_metadata[tag] = text.strip()
                 elif not self.all_scans:
                     tag = line.split(" ", 1)[0]
                     self.file_metadata[tag] = line[len(tag) :].strip()
