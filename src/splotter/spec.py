@@ -151,7 +151,8 @@ class SpecScan:
         command = self.scan_command
         if not command.known:
             return ()
-        columns = list(self._frame.columns)
+        # the #L labels, not the frame: a scan aborted before its first point has no rows
+        columns = self.columns
         found = []
         for i, axis in enumerate(command.axes):
             if command.space is Space.HKL:

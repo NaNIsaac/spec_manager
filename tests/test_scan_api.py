@@ -304,6 +304,24 @@ def test_a_restart_without_mnemonics_does_not_inherit_the_old_ones(tmp_path):
     assert new.axes == ("M5",)
 
 
+def test_a_scan_aborted_before_its_first_point_still_has_axes(tmp_path):
+    aborted = """
+#S 9 a2scan  sx 0 1  sy 0 2  2 1
+#D Wed Feb 17 21:00:00 1994
+#P0 27 13.5 90 0
+#P1 0 0
+#N 4
+#L Sample_X  Sample_Y  Epoch  Detector
+#C Wed Feb 17 21:00:01 1994.  Scan aborted after 0 points.
+"""
+    path = tmp_path / "aborted.spec"
+    path.write_text(HEADER + SCANS + aborted, encoding="utf-8")
+    with Spec(path) as spec:
+        scan = spec.get_scan(9)
+    assert scan.data == []
+    assert scan.axes == ("Sample_X", "Sample_Y")
+
+
 def test_hklmesh_takes_lower_case_coordinates():
     command = ScanCommand.parse("hklmesh h 0.9 1.1 2 l 0 0.2 2 1")
     assert command.known and [a.name for a in command.axes] == ["H", "L"]
