@@ -14,6 +14,7 @@ splotter rock demo.spec 6 7 8 --counter imroi3
 | `--counter NAME` | The counter to draw (default `imroi1`) |
 | `--labels TEXT ...` | One legend label per scan (default: the run numbers) |
 | `--save FILE` | Write the figure to a file instead of opening a window |
+| `--wait` | Keep the window in this terminal until it is closed |
 
 ## Peak width against Q
 
@@ -36,6 +37,7 @@ is one series in the plot. `splotter demo` writes `demo_fwhm.csv` next to `demo.
 | `--counter NAME` | The counter to fit (default `imroi1`) |
 | `--labels TEXT ...` | One legend label per list (default: the file names) |
 | `--save FILE` | Write the figure to a file instead of opening a window |
+| `--wait` | Keep the window in this terminal until it is closed |
 
 The width is the fit of the data as recorded. It is not corrected for the resolution of the
 instrument.

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from splotter import window
 from splotter.spec import Spec, run_id, scan_or_exit
 
 plt.rcParams["font.weight"] = "bold"
@@ -23,6 +24,7 @@ def main() -> None:
     )
     parser.add_argument("--counter", default="imroi1")
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
+    window.add_arguments(parser)
     args = parser.parse_args()
     labels = args.labels or [str(n) for n in args.scans]
 
@@ -50,7 +52,7 @@ def main() -> None:
     if args.save:
         fig.savefig(args.save, dpi=300, bbox_inches="tight")
     else:
-        plt.show()
+        window.show(args, __spec__.name)
 
 
 if __name__ == "__main__":

@@ -38,6 +38,7 @@ Scan 1: mesh sy -1 1 20 sx -1 1 20  0.5
 | `--vmax VALUE` | Top of the color scale (default: 10 times the mean) |
 | `--x NAME`, `--y NAME` | The motors of the axes (default `Sample_X`, `Sample_Y`) |
 | `--save FILE` | Write the figure to a file instead of opening a window |
+| `--wait` | Keep the window in this terminal until it is closed |
 
 Names match without regard to case, spaces and underscores. Files before 2015 usually have no
 `imtot`, so give a `--counter`; the error message lists the columns of the scan.
@@ -45,7 +46,8 @@ Names match without regard to case, spaces and underscores. Files before 2015 us
 ## Looking at one cell
 
 `splotter probe` draws the same map as `splotter mesh`, with the same arguments, in a window you can
-point at:
+point at. The command returns at once, and what a click prints still comes to this terminal, so
+closing the terminal closes the window on Windows (`--wait` keeps it in the foreground):
 
 ```
 splotter probe demo.spec 1 2 5 3 4 --log

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
+from splotter import window
 from splotter.spec import Spec
 
 HC_KEV_ANGSTROM = 12.398419843320026  # CODATA 2018 hc [keV·Å]
@@ -49,6 +50,7 @@ def main():
     parser.add_argument("--delta-offset", type=float, default=0.0, help="deg")
     parser.add_argument("--counter", default="imroi1")
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
+    window.add_arguments(parser)
     args = parser.parse_args()
     labels = args.labels or [f.stem for f in args.csv_files]
 
@@ -97,7 +99,7 @@ def main():
     if args.save:
         plt.savefig(args.save, dpi=300, bbox_inches="tight")
     else:
-        plt.show()
+        window.show(args, __spec__.name)
 
 
 if __name__ == "__main__":

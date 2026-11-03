@@ -51,6 +51,10 @@ splotter probe FILE 2614 2616 --log          # the same map: hover a cell for it
 splotter rock FILE 2033 --counter imroi1     # rocking curve
 ```
 
+A plot opens in a window of its own and the command returns at once, so the terminal stays free.
+`--wait` keeps the window in the terminal until it is closed; `--save FILE` writes the figure and
+opens no window.
+
 ## Documentation
 
 - [Overview](docs/index.md), [installation](docs/install.md) and [tutorial](docs/tutorial.md).

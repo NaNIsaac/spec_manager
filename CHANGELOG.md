@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- The plot windows of `mesh`, `probe`, `rock`, `gamdel` and `fwhm` open in a detached process,
+  so the command returns and the terminal stays free; closing the terminal leaves the window open.
+  Errors in the arguments are still reported in the terminal. `--wait` keeps the window in the
+  terminal as before, and `--save` opens no window.
+
 ## [0.1.4] - 2026-11-03
 
 ### Changed
