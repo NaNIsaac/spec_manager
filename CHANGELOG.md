@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `install.ps1` and `install.sh`: one line installs the `splotter` command on a machine with
+  nothing on it. They install uv if it is missing, then run `uv tool install --upgrade splotter`.
 - `scan["th"]`: a data column as an array, or the start position (`#P`) of a motor that did not
   move, by name or by mnemonic. `scan.at(point)`, `scan.positioners_at_start`, `scan.axes` (the
   `#L` names of what the command scanned) and `scan.warnings` (a `#P` count that does not match
