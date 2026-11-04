@@ -15,7 +15,23 @@ of SPEC.
 
 ## Install
 
-Requires Python 3.13 or later. Install it as a command with `uv tool install splotter` or
+One line, nothing needed beforehand: the script installs [uv](https://docs.astral.sh/uv/) if it is
+missing, and uv fetches a Python. Windows (cmd or PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/splotter/main/install.ps1 | iex"
+```
+
+macOS and Linux:
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/NaNIsaac/splotter/main/install.sh | sh
+```
+
+It runs `uv tool install splotter` and puts uv's command folder on `PATH` for new terminals.
+Run the same line again to update.
+
+By hand, it needs Python 3.13 or later. Install it as a command with `uv tool install splotter` or
 `pip install splotter`, or create a small uv project:
 
 <!-- test -->
