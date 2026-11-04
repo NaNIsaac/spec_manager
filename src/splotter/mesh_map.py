@@ -295,7 +295,7 @@ def style_colorbar(colorbar) -> None:
 
 def add_map_arguments(parser: argparse.ArgumentParser) -> None:
     """The arguments of splotter mesh, which splotter probe takes as well."""
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
     parser.add_argument("scans", type=run_id, nargs="+", help="mesh, ascan or dscan run numbers")
     parser.add_argument(
         "--counter", default="imtot", help="name or mnemonic, e.g. imtot, imroi1, imroi2, immax"
@@ -319,14 +319,20 @@ def add_map_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="splotter mesh",
         description="Map of one counter over the motor positions of SPEC mesh and line scans. "
-        "Several scans share the axes and the color scale; later runs draw over earlier ones."
+        "Several scans share the axes and the color scale; later runs draw over earlier ones.",
     )
     add_map_arguments(parser)
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
     window.add_arguments(parser)
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     _, maps, counter, x, y = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)

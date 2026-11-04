@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`ScanStarted`, `PointsAdded`, `ScanEnded` with its reason, `FileReread`). Only complete lines
   are read, and a replaced or shortened file is read again. On a network share that reports a
   stale size, the file is opened and its start and end compared every 10 seconds.
+- `docs/reference/cli.md` lists every command and option. `tools/argparse_markdown.py` writes it
+  from the parsers (`splotter.cli.parsers()`, and `build_parser()` in each command module), and a
+  test fails when the committed page is out of date.
+- `benchmarks/parse_speed.py` times the parser on a generated 60 MB log, against a release with
+  `--against 0.1.4`; the README has its numbers.
 
 ### Changed
 

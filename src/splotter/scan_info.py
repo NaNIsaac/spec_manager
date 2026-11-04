@@ -155,11 +155,12 @@ def print_scan_metadata(scan: SpecScan) -> None:
         print(f"{path} = {value}")
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Times, motors, counters and metadata of the scans in a SPEC file."
+        prog="splotter info",
+        description="Times, motors, counters and metadata of the scans in a SPEC file.",
     )
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
     parser.add_argument(
         "scan",
         type=run_id,
@@ -196,6 +197,11 @@ def main() -> None:
     )
     parser.add_argument("--csv", action="store_true", help="with -c: comma-separated output")
     parser.add_argument("--names", action="store_true", help="list the names -c accepts")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     if args.meta and args.point is not None:
         parser.error("--meta describes a scan or the file, not one point")
