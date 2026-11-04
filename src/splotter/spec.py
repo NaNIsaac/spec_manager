@@ -147,6 +147,7 @@ class SpecScan:
 
         A motor typed by a mnemonic needs #o to be found. Without it, the position of the axis in
         the command is taken as its column, as the standard macros write the scanned motors first.
+        A timescan or loopscan has the Time column as its axis.
         """
         command = self.scan_command
         if not command.known:
@@ -155,7 +156,7 @@ class SpecScan:
         columns = self.columns
         found = []
         for i, axis in enumerate(command.axes):
-            if command.space is Space.HKL:
+            if command.space in (Space.HKL, Space.TIME):
                 name = find_name(axis.name, columns)
             else:
                 name = self.motor_table.resolve(axis.name, columns)

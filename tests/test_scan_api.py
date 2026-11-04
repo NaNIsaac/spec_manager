@@ -90,14 +90,15 @@ SCANS = """
 0.9 0.2 0 3
 1.1 0.2 0 4
 
-#S 7 timescan 1 10
+#S 7 timescan 1 0
 #D Wed Feb 17 20:20:00 1994
 #P0 27 13.5 90 0
 #P1 0 0
-#N 2
-#L Epoch  Detector
-600 1
-601 2
+#N 4
+#L Time  Epoch  Seconds  Detector
+0 600 1 1
+1.2 601 1 2
+#C Wed Feb 17 20:20:03 1994.  Scan aborted after 2 points.
 """
 
 RESTART = """
@@ -140,6 +141,9 @@ def spec(tmp_path):
         ("hscan 0.9 1.1 10 1", "hscan", ["H"], (10,), 11, False, Space.HKL),
         ("hklscan 0.9 1.1 0 0 2 2 10 1", "hklscan", ["H", "K", "L"], (10,), 11, False, Space.HKL),
         ("hklmesh H 0.9 1.1 2 K 0 0.2 2 1", "hklmesh", ["H", "K"], (2, 2), 9, False, Space.HKL),
+        ("timescan 1 0", "timescan", ["Time"], (), None, False, Space.TIME),
+        ("timescan", "timescan", ["Time"], (), None, False, Space.TIME),
+        ("loopscan 10 0.5 0.5", "loopscan", ["Time"], (9,), 10, False, Space.TIME),
     ],
 )
 def test_manual_scan_forms(text, kind, axes, intervals, points, relative, space):
@@ -161,6 +165,15 @@ def test_th2th_moves_theta_half_the_range():
     assert (tth.start, tth.stop, th.start, th.stop) == (-2, 4, -1, 2)
 
 
+def test_time_scans_keep_count_and_sleep_times():
+    timescan = ScanCommand.parse("timescan 0.5 2")
+    assert (timescan.count, timescan.sleep) == (0.5, 2)
+    assert timescan.axes[0].stop is None
+    assert ScanCommand.parse("timescan 0.5").sleep is None
+    loopscan = ScanCommand.parse("loopscan 3 1")
+    assert (loopscan.points, loopscan.count, loopscan.sleep) == (3, 1, None)
+
+
 def test_negative_time_counts_to_monitor():
     assert ScanCommand.parse("ascan th 0 1 10 -1000").counts_to_monitor
     assert not ScanCommand.parse("ascan th 0 1 10 1").counts_to_monitor
@@ -169,7 +182,10 @@ def test_negative_time_counts_to_monitor():
 @pytest.mark.parametrize(
     "text",
     [
-        "timescan 1 10",
+        "timescan 1 0 5",
+        "loopscan 0 1",
+        "loopscan 5",
+        "Escan 8 9 10 1",
         "ascan th 0 1 10",
         "mesh sx 0 1 x sy 0 1 2 1",
         "hklmesh H 0 1 2 H 0 1 2 1",
@@ -225,12 +241,31 @@ def test_at_gives_every_motor_and_column_of_one_point(spec):
         (4, ("Sample_X", "Sample_Y")),
         (5, ("Two Theta", "Theta")),
         (6, ("H", "K")),
-        (7, ()),
+        (7, ("Time",)),
         (8, ("Stage Z",)),
     ],
 )
 def test_axes_come_from_the_command_and_the_header(spec, run, axes):
     assert spec.get_scan(run).axes == axes
+
+
+def test_a_time_scan_without_a_time_column_has_no_axes(tmp_path):
+    loopscan = """
+#S 9 loopscan 2 1 0
+#D Wed Feb 17 21:00:00 1994
+#P0 27 13.5 90 0
+#P1 0 0
+#N 2
+#L Epoch  Detector
+700 1
+701 2
+"""
+    path = tmp_path / "loop.spec"
+    path.write_text(HEADER + loopscan, encoding="utf-8")
+    with Spec(path) as spec:
+        scan = spec.get_scan(9)
+    assert scan.scan_command.known
+    assert scan.axes == ()
 
 
 def test_lup_counting_to_monitor(spec):

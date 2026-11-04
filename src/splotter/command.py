@@ -3,6 +3,11 @@
 The argument forms are those of the standard SPEC scan macros (SPEC manual, release 6, Standard
 Macro Guide, "Motor Scans" and "Basic Reciprocal Space Scans"). A motor appears as typed, usually
 its mnemonic; `splotter.names` turns it into the name the `#L` line uses.
+
+`timescan` and `loopscan` are not in that manual; their forms follow DECTRIS, "Usage of SPEC
+Macros". `timescan [count [sleep]]` counts until it is stopped; in measured files `Time` is the
+first `#L` column. `loopscan points count [sleep]` is taken to write the same columns, which no
+measured file has confirmed yet.
 """
 
 import math
@@ -14,15 +19,19 @@ from typing import Self
 class Space(StrEnum):
     MOTOR = "motor"
     HKL = "hkl"
+    TIME = "time"
 
 
 @dataclass(frozen=True)
 class Axis:
-    """One scanned quantity: a motor (as typed on the command line) or H, K or L."""
+    """One scanned quantity: a motor (as typed on the command line), H, K or L, or the time.
+
+    The time counts from the start of the scan; its stop is None, as the command does not fix it.
+    """
 
     name: str
     start: float
-    stop: float
+    stop: float | None
 
 
 @dataclass(frozen=True)
@@ -37,6 +46,7 @@ class ScanCommand:
     relative: bool = False
     space: Space = Space.MOTOR
     known: bool = False
+    sleep: float | None = None
 
     @property
     def is_mesh(self) -> bool:
@@ -78,6 +88,7 @@ LINE_SCANS = {
 # dmesh is not in the manual's table but is the common relative form of mesh, with its arguments.
 MESHES = {"mesh": False, "dmesh": True}
 HKL_LINES = {"hscan": "H", "kscan": "K", "lscan": "L"}
+TIME = Axis("Time", 0.0, None)
 
 
 def _parse(text: str, kind: str, args: list[str]) -> ScanCommand:
@@ -122,6 +133,31 @@ def _parse(text: str, kind: str, args: list[str]) -> ScanCommand:
             raise ValueError("hklmesh scans two different ones of H, K and L")
         intervals = (int(args[3]), int(args[7]))
         return ScanCommand(text, kind, axes, intervals, float(args[8]), space=Space.HKL, known=True)
+    if kind == "timescan":
+        # runs until stopped, so no number of points
+        if len(args) > 2:
+            raise ValueError(f"at most 2 arguments expected, {len(args)} given")
+        count, sleep = (*map(float, args), None, None)[:2]
+        return ScanCommand(
+            text, kind, (TIME,), count=count, sleep=sleep, space=Space.TIME, known=True
+        )
+    if kind == "loopscan":
+        if not 2 <= len(args) <= 3:
+            raise ValueError(f"2 or 3 arguments expected, {len(args)} given")
+        points = int(args[0])
+        if points < 1:
+            raise ValueError("loopscan takes at least one point")
+        sleep = float(args[2]) if len(args) == 3 else None
+        return ScanCommand(
+            text,
+            kind,
+            (TIME,),
+            (points - 1,),
+            float(args[1]),
+            space=Space.TIME,
+            known=True,
+            sleep=sleep,
+        )
     return ScanCommand(text, kind)
 
 
