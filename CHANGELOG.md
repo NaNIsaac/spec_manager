@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `docs/reference/cli.md` lists every command and option. `tools/argparse_markdown.py` writes it
   from the parsers (`splotter.cli.parsers()`, and `build_parser()` in each command module), and a
   test fails when the committed page is out of date.
+- `benchmarks/parse_speed.py` times the parser on a generated 60 MB log, against a release with
+  `--against 0.1.4`; the README has its numbers.
 
 ### Changed
 
