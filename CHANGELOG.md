@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `scan["th"]`: a data column as an array, or the start position (`#P`) of a motor that did not
+  move, by name or by mnemonic. `scan.at(point)`, `scan.positioners_at_start`, `scan.axes` (the
+  `#L` names of what the command scanned) and `scan.warnings` (a `#P` count that does not match
+  the motor names).
+- The `#o`, `#J` and `#j` header rows are read, so `sx` finds `Sample_X`.
+- `splotter.command.ScanCommand` parses a `#S` command in the forms of the standard SPEC macros:
+  `ascan`, `a2scan`, `a3scan`, `dscan`/`lup`, `d2scan`, `d3scan`, `th2th`, `mesh`, `dmesh`,
+  `hscan`/`kscan`/`lscan`, `hklscan` and `hklmesh`. Other commands are kept with no axes.
+
 ### Changed
 
 - The plot windows of `mesh`, `probe`, `rock`, `gamdel` and `fwhm` open in a detached process,
