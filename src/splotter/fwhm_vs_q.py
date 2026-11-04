@@ -7,7 +7,8 @@ import pandas as pd
 from scipy.optimize import curve_fit
 
 from splotter import window
-from splotter.spec import Spec
+from splotter.gam_del import add_angle_arguments, detector_angles
+from splotter.spec import Spec, SpecScan, curve_columns, run_id, scan_or_exit
 
 HC_KEV_ANGSTROM = 12.398419843320026  # CODATA 2018 hc [keV·Å]
 
@@ -36,49 +37,83 @@ def fit_gaussian_fwhm(x, y):
     return 2.3548 * abs(popt[2])
 
 
+def csv_series(spec: Spec, csv_path: Path) -> list[tuple[SpecScan, float, float]]:
+    """The scans of a scan list with the gamma and delta it gives them."""
+    csv_df = pd.read_csv(csv_path, header=None, names=["scan", "gamma", "delta", "theta"])
+    return [
+        (scan_or_exit(spec, int(row.scan)), row.gamma, row.delta) for row in csv_df.itertuples()
+    ]
+
+
+def scan_series(
+    spec: Spec, runs: list[str], gamma: str, delta: str
+) -> list[tuple[SpecScan, float, float]]:
+    """The scans of the runs with their gamma and delta at the start (#P)."""
+    scans = [scan_or_exit(spec, run) for run in runs]
+    return [(scan, *detector_angles(scan, gamma, delta)) for scan in scans]
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Gaussian FWHM of rocking scans vs Q, one series per scan-list CSV."
+        description="Gaussian FWHM of rocking scans vs Q: one series per scan-list CSV and one per "
+        "--scans, whose gamma and delta are read from the file."
     )
     parser.add_argument("spec_file", type=Path)
     parser.add_argument(
-        "csv_files", type=Path, nargs="+", help="headerless CSV: scan, gamma, delta, theta"
+        "csv_files", type=Path, nargs="*", help="headerless CSV: scan, gamma, delta, theta"
     )
-    parser.add_argument("--labels", nargs="+", help="one legend label per CSV (default: file stem)")
+    parser.add_argument(
+        "--scans",
+        type=run_id,
+        nargs="+",
+        action="append",
+        default=[],
+        metavar="RUN",
+        help="one series of runs, with gamma and delta from #P; give it again for another",
+    )
+    parser.add_argument(
+        "--labels",
+        nargs="+",
+        help="one legend label per series, CSVs first (default: file stem, or the runs)",
+    )
     parser.add_argument("--energy", type=float, required=True, help="keV")
     parser.add_argument("--gamma-offset", type=float, default=0.0, help="deg")
     parser.add_argument("--delta-offset", type=float, default=0.0, help="deg")
-    parser.add_argument("--counter", default="imroi1")
+    parser.add_argument("--counter", default="imroi1", help="name or mnemonic")
+    add_angle_arguments(parser)
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
     window.add_arguments(parser)
     args = parser.parse_args()
-    labels = args.labels or [f.stem for f in args.csv_files]
+    if not args.csv_files and not args.scans:
+        parser.error("give a scan-list CSV or --scans")
+    labels = args.labels or [
+        *(f.stem for f in args.csv_files),
+        *(
+            f"runs {runs[0]}-{runs[-1]}" if len(runs) > 1 else f"run {runs[0]}"
+            for runs in args.scans
+        ),
+    ]
+    if len(labels) != len(args.csv_files) + len(args.scans):
+        parser.error("--labels needs one label per series")
 
     plt.figure(figsize=(10, 7))
 
     with Spec(args.spec_file) as spec:
-        for csv_path, label in zip(args.csv_files, labels, strict=True):
-            csv_df = pd.read_csv(csv_path, header=None, names=["scan", "gamma", "delta", "theta"])
+        series = [csv_series(spec, path) for path in args.csv_files]
+        series += [scan_series(spec, runs, args.gamma, args.delta) for runs in args.scans]
+        for points, label in zip(series, labels, strict=True):
             group_results = []
 
-            for _, row in csv_df.iterrows():
-                scan = spec.get_scan(int(row["scan"]))
+            for scan, gamma, delta in points:
                 if not scan.data:
                     continue
 
                 q_val = calculate_q_geometry(
-                    row["delta"],
-                    row["gamma"],
-                    args.energy,
-                    g_off=args.gamma_offset,
-                    d_off=args.delta_offset,
+                    delta, gamma, args.energy, g_off=args.gamma_offset, d_off=args.delta_offset
                 )
-
-                df_spec = scan.to_dataframe()
-                x_data = df_spec.iloc[:, 0].values.astype(float)
-                y_data = df_spec[args.counter].values.astype(float)
-
-                fwhm = fit_gaussian_fwhm(x_data, y_data)
+                axis, counter = curve_columns(scan, args.counter)
+                y_data = scan[counter]
+                fwhm = fit_gaussian_fwhm(scan[axis], y_data)
 
                 if not np.isnan(fwhm):
                     group_results.append({"q": q_val, "fwhm": fwhm, "intensity": sum(y_data)})

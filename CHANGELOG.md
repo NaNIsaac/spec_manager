@@ -19,8 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `timescan [count [sleep]]` and `loopscan points count [sleep]` are known commands too, with
   `Time` as their axis (`Space.TIME`) and the sleep time in `ScanCommand.sleep`. A timescan has no
   planned number of points. A file whose time scan has no `Time` column gives it no axes.
+- `scan.column(name)` and `scan.motor(name)`: the `#L` column or `#O` motor meant by a name or a
+  mnemonic.
+- `splotter fwhm --scans RUN ...`: a series without a scan list, with gamma and delta from `#P`;
+  `--gamma` and `--delta` name those motors in `fwhm` and `gamdel`.
 
 ### Changed
+
+- `mesh`, `probe`, `info`, `rock`, `gamdel` and `fwhm` take motors and counters by mnemonic too
+  (`--x sx`, `--counter det`, `-c tth`) where the file has `#o` and `#j` rows.
+- `mesh` and `probe` read the motors and ranges from the parsed command, so `lup` maps as a line
+  as `ascan` and `dscan` do, and a scan that is no map of two motors (`a2scan`, `hklmesh`,
+  `timescan`) is refused by name. Without `--x` and `--y`, a mesh of motors other than `Sample_X`
+  and `Sample_Y` puts its outer motor across and its inner one down.
+- `rock` and `fwhm` take the axis of a curve from the command (`Time` for a time scan), not the
+  first column, and stop with the columns listed when the counter is missing. The `rock` axis is
+  labeled with that column instead of ω.
+- `gamdel` stops with the motor named when a run lacks gamma or delta, instead of leaving it out.
 
 - The plot windows of `mesh`, `probe`, `rock`, `gamdel` and `fwhm` open in a detached process,
   so the command returns and the terminal stays free; closing the terminal leaves the window open.

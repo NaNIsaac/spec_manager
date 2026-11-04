@@ -39,7 +39,8 @@ Found by that survey and not solved:
   parser pairs names and values in order without warning.
 - In 6 scans the `#L` names do not match the `#N` count in either way of splitting.
 - A data line cut short, by an aborted scan for instance, is dropped.
-- A motor that the file calls differently is not recognized as the same motor: `sx` is not `Sample_X`.
+- A file without `#o` and `#j` rows knows a motor or counter by its name only: there `sx` is not
+  `Sample_X`.
 
 The survey used this release of the parser. A file that reads wrongly is worth
 [an issue](https://github.com/NaNIsaac/splotter/issues), with a few lines of its header and of the scan

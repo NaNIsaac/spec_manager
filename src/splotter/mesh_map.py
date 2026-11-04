@@ -12,7 +12,8 @@ from matplotlib.ticker import AutoMinorLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from splotter import window
-from splotter.spec import Spec, SpecScan, find_name, name_key, run_id, scan_or_exit
+from splotter.command import Axis, Space
+from splotter.spec import Spec, SpecScan, name_key, run_id, scan_or_exit
 
 plt.rcParams["font.weight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
@@ -27,6 +28,7 @@ OUTLINE_STYLES = ["solid", "dashed", "dashdot", "dotted"]
 # a thin dark edge keeps them on the gray fill
 OUTLINE_HALO = [Stroke(linewidth=1.8, foreground="black", alpha=0.5), Normal()]
 MEAN_FACTOR = 10  # the color scale ends at this many times the mean
+SAMPLE_AXES = ("Sample_X", "Sample_Y")
 LEGEND_STYLE = {
     "facecolor": LEGEND_FILL,
     "edgecolor": LEGEND_FILL,
@@ -62,13 +64,13 @@ class ScanMap:
         return self.values[iy, ix], x, y
 
 
-def centres(start: str, stop: str, intervals: str, first: float) -> tuple[np.ndarray, float]:
+def centres(axis: Axis, intervals: int, first: float) -> tuple[np.ndarray, float]:
     """Cell centres of a scan axis, from its first measured position, and the step.
 
     The command gives only the step: dscan and dmesh ranges are relative to the start position.
     """
-    step = (float(stop) - float(start)) / int(intervals)
-    return first + step * np.arange(int(intervals) + 1), step
+    step = (axis.stop - axis.start) / intervals
+    return first + step * np.arange(intervals + 1), step
 
 
 def edges(centre: np.ndarray, step: float) -> np.ndarray:
@@ -80,7 +82,7 @@ def scan_map(scan: SpecScan, counter: str, x: str, y: str) -> ScanMap:
     df = scan.to_dataframe()
     if df.empty:
         raise SystemExit(f"scan {scan.label} has no data")
-    column = find_name(counter, df.columns)
+    column = scan.column(counter)
     if not column:
         raise SystemExit(f"no counter '{counter}'; columns: {', '.join(df.columns)}")
     return place_values(scan, df, df[column].to_numpy(dtype=float), x, y)
@@ -95,35 +97,40 @@ def point_map(scan: SpecScan, x: str, y: str) -> ScanMap:
 
 
 def place_values(scan: SpecScan, df, measured: np.ndarray, x: str, y: str) -> ScanMap:
-    """Put one value per data row of the scan on the cell where the row was measured."""
-    x_key, y_key = name_key(x), name_key(y)
-    tokens = scan.command.split()
-    if "mesh" in tokens[0]:
-        # e.g. "mesh sy -2.5 -1.5 25 sx -6.7 -5.7 25 0.5"; 25 is the number of intervals
-        fast, slow = df.columns[:2]
-        if {name_key(fast), name_key(slow)} != {x_key, y_key}:
+    """Put one value per data row of the scan on the cell where the row was measured.
+
+    x and y are motor names or mnemonics; the scanned ones are found among the axes of the command.
+    """
+    command, axes = scan.scan_command, scan.axes
+    if command.space is not Space.MOTOR or not (command.is_mesh or len(axes) == 1):
+        raise SystemExit(
+            f"scan {scan.label} is neither a mesh nor a line scan of one motor: '{scan.command}'"
+        )
+    x_axis, y_axis = scan.motor_table.resolve(x, axes), scan.motor_table.resolve(y, axes)
+    if command.is_mesh:
+        # the first motor of "mesh sy -2.5 -1.5 25 sx -6.7 -5.7 25 0.5" runs at each point of sx
+        fast, slow = axes
+        if {x_axis, y_axis} != {fast, slow}:
             raise SystemExit(f"scan {scan.label} moves {fast} and {slow}, not {x} and {y}")
-        fast_pos, fast_step = centres(*tokens[2:5], df[fast].iloc[0])
-        slow_pos, slow_step = centres(*tokens[6:9], df[slow].iloc[0])
+        fast_pos, fast_step = centres(command.axes[0], command.intervals[0], df[fast].iloc[0])
+        slow_pos, slow_step = centres(command.axes[1], command.intervals[1], df[slow].iloc[0])
         grid = np.full(fast_pos.size * slow_pos.size, np.nan)
         grid[: measured.size] = measured
         grid = grid.reshape(slow_pos.size, fast_pos.size)
         x_edges, y_edges = edges(slow_pos, slow_step), edges(fast_pos, fast_step)
-        if name_key(fast) == x_key:
+        if fast == x_axis:
             return ScanMap(scan.label, edges(fast_pos, fast_step), edges(slow_pos, slow_step), grid)
         return ScanMap(scan.label, x_edges, y_edges, grid.T)
 
-    if tokens[0] not in ("ascan", "dscan"):
-        raise SystemExit(f"scan {scan.label} is neither a mesh nor an ascan: '{scan.command}'")
-    moved = df.columns[0]
-    if name_key(moved) not in (x_key, y_key):
+    (moved,) = axes
+    if moved not in (x_axis, y_axis):
         raise SystemExit(f"scan {scan.label} moves {moved}, not {x} or {y}")
-    along_x = name_key(moved) == x_key
-    fixed = find_name(y if along_x else x, scan.motors)
+    along_x = moved == x_axis
+    fixed = scan.motor(y if along_x else x)
     if not fixed:
         raise SystemExit(f"scan {scan.label} records no position of {y if along_x else x}")
 
-    along, step = centres(*tokens[2:5], df[moved].iloc[0])
+    along, step = centres(command.axes[0], command.intervals[0], df[moved].iloc[0])
     values = np.full(along.size, np.nan)
     values[: measured.size] = measured
     # a line has no width of its own: draw square cells
@@ -168,23 +175,47 @@ def figure_size(x_span: float, y_span: float) -> tuple[float, float]:
     return width + COLORBAR_AND_LABELS, height + TITLE_AND_LABELS
 
 
-def load_maps(spec_file: Path, runs: list[str], counter: str, x: str, y: str):
-    """The scans of the runs and their maps; prints each command, mean and peak."""
+def default_axes(scans: list[SpecScan]) -> tuple[str, str]:
+    """--x and --y when not given: Sample_X across and Sample_Y down if the scans move either;
+    otherwise the outer motor of the first mesh across and its inner motor down."""
+    scanned = {name_key(axis) for scan in scans for axis in scan.axes}
+    meshes = [
+        scan.axes
+        for scan in scans
+        if scan.scan_command.is_mesh and scan.scan_command.space is Space.MOTOR and scan.axes
+    ]
+    if not meshes or scanned & {name_key(axis) for axis in SAMPLE_AXES}:
+        return SAMPLE_AXES
+    inner, outer = meshes[0]
+    return outer, inner
+
+
+def load_maps(
+    spec_file: Path, runs: list[str], counter: str, x: str | None = None, y: str | None = None
+):
+    """The scans of the runs, their maps and the names of counter, x and y; prints each command,
+    mean and peak.
+
+    The names may be given as mnemonics; x and y default to default_axes.
+    """
     print(f"Load spec file: '{spec_file}'")
-    scans, maps = [], []
     with Spec(spec_file) as spec:
-        for run in runs:
-            scan = scan_or_exit(spec, run)
-            print(f"Scan {run}: {scan.command}")
-            maps.append(scan_map(scan, counter, x, y))
-            scans.append(scan)
-            value, peak_x, peak_y = maps[-1].peak()
-            mean = np.nanmean(maps[-1].values)
-            print(
-                f"  mean {counter} = {mean:.4g}, "
-                f"max {counter} = {value:g} at {x} = {peak_x:g}, {y} = {peak_y:g}"
-            )
-    return scans, maps
+        scans = [scan_or_exit(spec, run) for run in runs]
+    default_x, default_y = default_axes(scans)
+    x, y = x or default_x, y or default_y
+    first = scans[0]
+    x, y, counter = first.motor(x) or x, first.motor(y) or y, first.column(counter) or counter
+    maps = []
+    for run, scan in zip(runs, scans, strict=True):
+        print(f"Scan {run}: {scan.command}")
+        maps.append(scan_map(scan, counter, x, y))
+        value, peak_x, peak_y = maps[-1].peak()
+        mean = np.nanmean(maps[-1].values)
+        print(
+            f"  mean {counter} = {mean:.4g}, "
+            f"max {counter} = {value:g} at {x} = {peak_x:g}, {y} = {peak_y:g}"
+        )
+    return scans, maps, counter, x, y
 
 
 def map_spans(maps: list[ScanMap]) -> tuple[float, float]:
@@ -266,9 +297,18 @@ def add_map_arguments(parser: argparse.ArgumentParser) -> None:
     """The arguments of splotter mesh, which splotter probe takes as well."""
     parser.add_argument("spec_file", type=Path)
     parser.add_argument("scans", type=run_id, nargs="+", help="mesh, ascan or dscan run numbers")
-    parser.add_argument("--counter", default="imtot", help="e.g. imtot, imroi1, imroi2, immax")
-    parser.add_argument("--x", default="Sample_X", help="motor of the horizontal axis")
-    parser.add_argument("--y", default="Sample_Y", help="motor of the vertical axis")
+    parser.add_argument(
+        "--counter", default="imtot", help="name or mnemonic, e.g. imtot, imroi1, imroi2, immax"
+    )
+    parser.add_argument(
+        "--x",
+        help="motor of the horizontal axis, name or mnemonic (default: Sample_X if the scans move "
+        "Sample_X or Sample_Y, else the outer motor of the first mesh)",
+    )
+    parser.add_argument(
+        "--y",
+        help="motor of the vertical axis (default: Sample_Y, or the inner motor of the first mesh)",
+    )
     parser.add_argument(
         "--log", action="store_true", help="log color scale; zero counts take its lowest color"
     )
@@ -289,14 +329,14 @@ def main() -> None:
     window.add_arguments(parser)
     args = parser.parse_args()
 
-    _, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
+    _, maps, counter, x, y = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
     norm = color_scale(maps, args.log, args.vmax)
     fig, ax = plt.subplots(1, 1, figsize=figure_size(*map_spans(maps)), layout="constrained")
     mesh, legend_handles = draw_maps(ax, maps, norm)
-    style_axes(ax, maps, args.counter, args.x, args.y)
+    style_axes(ax, maps, counter, x, y)
     # beside the axes, so that it keeps their height when equal units shorten them
     colorbar_axes = make_axes_locatable(ax).append_axes("right", size=0.3, pad=0.15)
-    colorbar = fig.colorbar(mesh, cax=colorbar_axes, label=f"{args.counter} [counts]")
+    colorbar = fig.colorbar(mesh, cax=colorbar_axes, label=f"{counter} [counts]")
     style_colorbar(colorbar)
     if legend_handles:
         fig.legend(

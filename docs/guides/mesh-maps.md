@@ -27,7 +27,8 @@ Scan 1: mesh sy -1 1 20 sx -1 1 20  0.5
 - **Overlaps:** the run given later is drawn on top. Change the order to see the other one.
 - **Outlines:** with several scans, each has its own color and line style, named in the legend.
 - **Axes:** the horizontal axis is `Sample_X` and the vertical one is `Sample_Y`, with smaller numbers
-  at the top. Equal lengths on both axes are the same distance.
+  at the top. Equal lengths on both axes are the same distance. A mesh of other motors puts its outer
+  motor, the second of the command, across and its inner one down.
 
 ## Options
 
@@ -36,12 +37,16 @@ Scan 1: mesh sy -1 1 20 sx -1 1 20  0.5
 | `--counter NAME` | The counter to draw (default `imtot`) |
 | `--log` | Log color scale; zero counts take its lowest color, so they do not look unmeasured |
 | `--vmax VALUE` | Top of the color scale (default: 10 times the mean) |
-| `--x NAME`, `--y NAME` | The motors of the axes (default `Sample_X`, `Sample_Y`) |
+| `--x NAME`, `--y NAME` | The motors of the axes (default `Sample_X`, `Sample_Y` if the scans move either, else the motors of the first mesh) |
 | `--save FILE` | Write the figure to a file instead of opening a window |
 | `--wait` | Keep the window in this terminal until it is closed |
 
-Names match without regard to case, spaces and underscores. Files before 2015 usually have no
-`imtot`, so give a `--counter`; the error message lists the columns of the scan.
+Names match without regard to case, spaces and underscores, and a mnemonic as typed in SPEC
+(`sx`, `imroi1`) finds its name where the file has `#o` and `#j` rows. Files before 2015 usually
+have no `imtot`, so give a `--counter`; the error message lists the columns of the scan.
+
+The map takes the motors and ranges from the scan command: `mesh` and `dmesh` as a grid, and
+`ascan`, `dscan` and `lup` of one of the two motors as a line at the start position of the other.
 
 ## Looking at one cell
 
@@ -68,7 +73,7 @@ splotter probe demo.spec 1 --counter imroi3 --show Sample_X Sample_Y imroi3 imma
 |---|---|
 | `--counter NAME` | The counter that gives the colors (default `imtot`) |
 | `--show NAME ...` | What the panel lists besides the two axes (default: every counter) |
-| `--x NAME`, `--y NAME` | The motors of the axes (default `Sample_X`, `Sample_Y`) |
+| `--x NAME`, `--y NAME` | The motors of the axes, as for `splotter mesh` |
 | `--log`, `--vmax VALUE` | As for `splotter mesh`, as is the color scale of several scans |
 
 It has no `--save`, as a picture holds no mouse; use `splotter mesh --save` for that. The legend of

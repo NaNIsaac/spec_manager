@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from splotter.spec import Spec, SpecScan, find_name, run_id, scan_or_exit
+from splotter.spec import Spec, SpecScan, run_id, scan_or_exit
 
 TIME = "time"  # for --columns: not a SPEC column, computed from Epoch and #D
 CELL_GAP = 3
@@ -72,7 +72,7 @@ def point_table(scan: SpecScan, names: list[str]) -> pd.DataFrame:
     table = pd.DataFrame(index=df.index.rename("point"))
     only_fixed_motors = True
     for name in names:
-        column, motor = find_name(name, df.columns), find_name(name, scan.motors)
+        column, motor = scan.column(name) if not df.empty else None, scan.motor(name)
         if name == TIME and "Epoch" in df.columns:
             seconds = df["Epoch"] - df["Epoch"].iloc[0]
             table[name] = scan.time + pd.to_timedelta(seconds, unit="s")
@@ -93,7 +93,7 @@ def scan_table(scans: list[SpecScan], names: list[str]) -> pd.DataFrame:
     for scan in scans:
         row = {}
         for name in names:
-            motor = find_name(name, scan.motors)
+            motor = scan.motor(name)
             if name != TIME and not motor:
                 raise SystemExit(
                     f"scan {scan.label} has no motor '{name}'; give a run for counters"
@@ -169,8 +169,8 @@ def main() -> None:
         "--columns",
         nargs="+",
         metavar="NAME",
-        help="print only these as a table: data columns or motors of the scan, and 'time'; "
-        "without a scan, motors at the start of each scan",
+        help="print only these as a table: data columns or motors of the scan, by name or "
+        "mnemonic, and 'time'; without a scan, motors at the start of each scan",
     )
     parser.add_argument(
         "--top", type=int, metavar="N", help="with -c: the N points largest in the first column"
