@@ -236,11 +236,12 @@ def draw(scans: list[SpecScan], maps: list[ScanMap], args) -> tuple:
     return fig, InfoPanel(fig, ax, Probes(probes))
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="splotter probe",
         description="The map of splotter mesh, to point at: hover over a cell and the panel at its "
         "left lists the scan, point number, motor positions and counters; click to mark the cell "
-        "and print everything recorded there. Where scans overlap, the later run is the one listed."
+        "and print everything recorded there. Where scans overlap, the later run is the one listed.",
     )
     add_map_arguments(parser)
     parser.add_argument(
@@ -250,6 +251,11 @@ def main() -> None:
         help="counters and motors in the panel, names or mnemonics (default: every counter)",
     )
     window.add_arguments(parser)
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     scans, maps, args.counter, args.x, args.y = load_maps(

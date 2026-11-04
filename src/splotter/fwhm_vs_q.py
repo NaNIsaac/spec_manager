@@ -53,12 +53,13 @@ def scan_series(
     return [(scan, *detector_angles(scan, gamma, delta)) for scan in scans]
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="splotter fwhm",
         description="Gaussian FWHM of rocking scans vs Q: one series per scan-list CSV and one per "
-        "--scans, whose gamma and delta are read from the file."
+        "--scans, whose gamma and delta are read from the file.",
     )
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
     parser.add_argument(
         "csv_files", type=Path, nargs="*", help="headerless CSV: scan, gamma, delta, theta"
     )
@@ -83,6 +84,11 @@ def main():
     add_angle_arguments(parser)
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
     window.add_arguments(parser)
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     if not args.csv_files and not args.scans:
         parser.error("give a scan-list CSV or --scans")

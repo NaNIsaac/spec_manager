@@ -204,12 +204,18 @@ def write_demo(path: Path) -> tuple[Path, Path]:
     return path, scan_list
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Write a made-up SPEC file to try the commands on; nothing in it is measured."
+        prog="splotter demo",
+        description="Write a made-up SPEC file to try the commands on; nothing in it is measured.",
     )
     parser.add_argument("out", type=Path, help="SPEC file to write, e.g. demo.spec")
     parser.add_argument("--force", action="store_true", help="overwrite existing files")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     scan_list = args.out.with_name(f"{args.out.stem}_fwhm.csv")
     if not args.force:

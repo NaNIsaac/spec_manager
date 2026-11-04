@@ -1,5 +1,6 @@
 """The splotter command: each subcommand runs the main() of one module."""
 
+import argparse
 import importlib
 import sys
 from importlib.metadata import version
@@ -13,6 +14,14 @@ COMMANDS = {
     "fwhm": ("splotter.fwhm_vs_q", "Gaussian FWHM of rocking scans against Q"),
     "demo": ("splotter.demo", "write a made-up SPEC file to try the commands on"),
 }
+
+
+def parsers() -> dict[str, argparse.ArgumentParser]:
+    """The parser of each command, as docs/reference/cli.md is written from."""
+    return {
+        name: importlib.import_module(module).build_parser()
+        for name, (module, _) in COMMANDS.items()
+    }
 
 
 def usage() -> str:

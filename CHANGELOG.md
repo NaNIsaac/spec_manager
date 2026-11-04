@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   mnemonic.
 - `splotter fwhm --scans RUN ...`: a series without a scan list, with gamma and delta from `#P`;
   `--gamma` and `--delta` name those motors in `fwhm` and `gamdel`.
+- `docs/reference/cli.md` lists every command and option. `tools/argparse_markdown.py` writes it
+  from the parsers (`splotter.cli.parsers()`, and `build_parser()` in each command module), and a
+  test fails when the committed page is out of date.
 
 ### Changed
 
