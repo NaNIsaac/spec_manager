@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   first column, and stop with the columns listed when the counter is missing. The `rock` axis is
   labeled with that column instead of ω.
 - `gamdel` stops with the motor named when a run lacks gamma or delta, instead of leaving it out.
+- The parser keeps the data lines of a scan as text and turns them into numbers when its rows,
+  skipped lines or frame are first used, so a file opens in a fraction of the time and a command
+  that looks at a few scans never converts the others. Frames are built from one array per scan.
+  What a file reads to is unchanged.
 
 - The plot windows of `mesh`, `probe`, `rock`, `gamdel` and `fwhm` open in a detached process,
   so the command returns and the terminal stays free; closing the terminal leaves the window open.

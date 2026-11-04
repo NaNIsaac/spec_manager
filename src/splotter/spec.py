@@ -80,6 +80,37 @@ def _xml_to_dict(element: ET.Element) -> Any:
     return result
 
 
+class ReadOnUse:
+    """A field of SpecScan that the parser leaves as text until it is first asked for.
+
+    Turning every number of a file into a float takes most of a parse, while a command mostly
+    looks at a few scans. The data lines are read into arrays when the rows, the count of skipped
+    lines or the frame are first wanted, and the arrays into lists only for the rows.
+    """
+
+    def __init__(self, default: Any, convert):
+        self.default, self.convert = default, convert
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self.name, self.attribute = name, f"_{name}_value"
+
+    def __get__(self, scan: "SpecScan | None", owner: type | None = None) -> Any:
+        if scan is None:
+            return self.default
+        if scan._lines is not None:
+            scan._read_lines()
+        if self.name == "data" and scan._arrays is not None:
+            arrays, scan._arrays = scan._arrays, None
+            getattr(scan, self.attribute).extend(row for array in arrays for row in array.tolist())
+            scan._rows_from_file = True
+        return getattr(scan, self.attribute)
+
+    def __set__(self, scan: "SpecScan", value: Any) -> None:
+        setattr(scan, self.attribute, self.convert(value))
+        if self.name == "data":
+            scan._arrays, scan._rows_from_file = None, False
+
+
 @dataclass
 class SpecScan:
     scan_no: int
@@ -87,9 +118,12 @@ class SpecScan:
     motor_names: list[str]
     metadata: dict[str, Any] = field(default_factory=dict)
     columns: list[str] = field(default_factory=list)
-    data: list[list[float]] = field(default_factory=list)
+    data: list[list[float]] = ReadOnUse(
+        (), lambda rows: rows if isinstance(rows, list) else [*rows]
+    )
     time: datetime = field(default_factory=datetime.now)
-    skipped_lines: int = 0  # lines between the data that are not a row of the #L columns
+    # lines between the data that are not a row of the #L columns
+    skipped_lines: int = ReadOnUse(0, int)
     label: str = ""  # the run number, or 12.2 for the second scan numbered 12
     motor_mnemonics: list[str] = field(default_factory=list)
     counter_names: list[str] = field(default_factory=list)
@@ -97,9 +131,39 @@ class SpecScan:
     _raw_p_values: list[float] = field(default_factory=list, repr=False)
     _raw_uxml: list[str] = field(default_factory=list, repr=False)
     _uxml_dict: dict[str, Any] | None = field(default=None, repr=False, init=False)
+    # the data lines the parser kept, each run under the #L width it follows; None once read
+    _lines: list[tuple[int, list[str]]] | None = field(
+        default=None, repr=False, init=False, compare=False
+    )
+    # the rows read from those lines, one array per run, until the rows are asked for as lists
+    _arrays: list[np.ndarray] | None = field(default=None, repr=False, init=False, compare=False)
+    _rows_from_file: bool = field(default=False, repr=False, init=False, compare=False)
 
     def __post_init__(self) -> None:
         self.label = self.label or str(self.scan_no)
+
+    def _read_lines(self) -> None:
+        lines, self._lines = self._lines, None
+        arrays, skipped = [], 0
+        for n_columns, run in lines:
+            tokens, kept = [], 0
+            for line in run:
+                parts = line.split()
+                # float() would accept the underscore of a label such as 6_1
+                if n_columns and len(parts) == n_columns and "_" not in line:
+                    tokens += parts
+                    kept += 1
+            try:
+                array = np.array(tokens, dtype=float)
+            except ValueError:
+                # words as many as the columns: find them line by line
+                rows = [row for line in run if (row := data_row(line, n_columns)) is not None]
+                array, kept = np.array(rows, dtype=float), len(rows)
+            skipped += len(run) - kept
+            if kept:
+                arrays.append(array.reshape(kept, n_columns))
+        self.skipped_lines += skipped
+        self._arrays = (self._arrays or []) + arrays
 
     @property
     def motors(self) -> dict[str, float]:
@@ -227,10 +291,25 @@ class SpecScan:
         return self._uxml_dict
 
     def to_dataframe(self):
+        if self._lines is not None:
+            self._read_lines()
+        if self._arrays is not None:
+            # the arrays hold the rows, so the lists need not be made
+            if not self.columns or not self._arrays:
+                return pd.DataFrame()
+            # a second #L inside a scan changes the width; keep the rows of the last one
+            arrays = [array for array in self._arrays if array.shape[1] == len(self.columns)]
+            if not arrays:
+                return pd.DataFrame([], columns=self.columns)
+            return pd.DataFrame(np.concatenate(arrays), columns=self.columns)
         if not self.columns or not self.data:
             return pd.DataFrame()
         # a second #L inside a scan changes the width; keep the rows of the last one
         rows = [row for row in self.data if len(row) == len(self.columns)]
+        if rows and self._rows_from_file:
+            # every value went through float(), so one array gives the frame pandas would build
+            # column by column, many times faster
+            return pd.DataFrame(np.array(rows, dtype=float), columns=self.columns)
         return pd.DataFrame(rows, columns=self.columns)
 
     @property
@@ -264,10 +343,43 @@ class Spec:
         current_scan = None
         # motor names, motor mnemonics, counter names, counter mnemonics of the current session
         rows: dict[str, list[str]] = {"O": self.motor_names, "o": [], "J": [], "j": []}
+        data_lines: list[str] = []
 
-        for line in file:
+        # The lines of a scan, most of them data and #UXML, take the first branches: a file holds
+        # close to a million lines, and each test on every line costs a share of the parse time.
+        for line in file.read().split("\n"):
             line = line.strip()
             if not line:
+                continue
+            if line[0] != "#":
+                if current_scan is not None:
+                    data_lines.append(line)
+                elif not self.all_scans:
+                    tag = line.split(" ", 1)[0]
+                    self.file_metadata[tag] = line[len(tag) :].strip()
+                continue
+            second = line[1:2]
+            # no #F, #E or header row, so the line stays in the scan
+            if current_scan is not None and second and second not in "FEOoJjS":
+                if second == "U" and line.startswith("#UXML"):
+                    if xml_content := line[5:].lstrip():
+                        current_scan._raw_uxml.append(xml_content)
+                elif second == "D" and line.startswith("#D "):
+                    current_scan.time = datetime.strptime(line[3:], "%a %b %d %H:%M:%S %Y")
+                elif second == "L" and line.startswith("#L "):
+                    declared = current_scan.metadata.get("#N", "")
+                    current_scan.columns = split_names(
+                        line[3:], int(declared) if declared.isdigit() else None
+                    )
+                    data_lines = []
+                    current_scan._lines.append((len(current_scan.columns), data_lines))
+                elif second == "P" and line[2:3].isdigit():
+                    current_scan._raw_p_values.extend(
+                        [float(x) for x in line[line.find(" ") + 1 :].split()]
+                    )
+                else:
+                    tag = line.split(" ", 1)[0]
+                    current_scan.metadata[tag] = line[len(tag) :].strip()
                 continue
             if line.startswith("#S "):
                 parts = line.split(maxsplit=2)
@@ -284,6 +396,8 @@ class Spec:
                 )
                 self.scans[scan_no] = current_scan
                 self.all_scans.append(current_scan)
+                data_lines = []
+                current_scan._lines = [(0, data_lines)]
                 continue
 
             # a restarted SPEC session writes a new file header between two scans
@@ -311,30 +425,9 @@ class Spec:
                     tag = line.split(" ", 1)[0]
                     self.file_metadata[tag] = line[len(tag) :].strip()
             else:
-                if line.startswith("#D "):
-                    current_scan.time = datetime.strptime(line[3:], "%a %b %d %H:%M:%S %Y")
-                elif line.startswith("#L "):
-                    declared = current_scan.metadata.get("#N", "")
-                    current_scan.columns = split_names(
-                        line[3:], int(declared) if declared.isdigit() else None
-                    )
-                elif line.startswith("#P") and line[2:3].isdigit():
-                    current_scan._raw_p_values.extend(
-                        [float(x) for x in line[line.find(" ") + 1 :].split()]
-                    )
-                elif line.startswith("#UXML"):
-                    xml_content = re.sub(r"^#UXML\s*", "", line)
-                    if xml_content:
-                        current_scan._raw_uxml.append(xml_content)
-                elif line.startswith("#"):
-                    tag = line.split(" ", 1)[0]
-                    current_scan.metadata[tag] = line[len(tag) :].strip()
-                else:
-                    row = data_row(line, len(current_scan.columns))
-                    if row is None:
-                        current_scan.skipped_lines += 1
-                    else:
-                        current_scan.data.append(row)
+                # what is left in a scan: a tag such as "#S" without a run, or a bare "#"
+                tag = line.split(" ", 1)[0]
+                current_scan.metadata[tag] = line[len(tag) :].strip()
 
         numbers = Counter(scan.scan_no for scan in self.all_scans)
         seen: Counter[int] = Counter()
