@@ -171,12 +171,18 @@ for _name in PLOT_COMMANDS:
     setattr(Shell, f"do_{_name}", plot_command(_name))
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="splotter shell",
         description="Read a SPEC file once and query it at a prompt: ls, show, wa, pa, the plot "
-        "commands, and tail to follow the file as it grows."
+        "commands, and tail to follow the file as it grows.",
     )
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     Shell(args.spec_file).cmdloop()
 
