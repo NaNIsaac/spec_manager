@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.widgets import Slider, TextBox
 
+from splotter import window
 from splotter.spec import Spec, run_id, scan_or_exit
 
 
@@ -37,6 +38,7 @@ def main():
     parser.add_argument(
         "runs", type=run_id, nargs="+", help="run numbers, plotted in the given order"
     )
+    window.add_arguments(parser)
     args = parser.parse_args()
     spec_file, run_ns = args.spec_file, args.runs
 
@@ -135,7 +137,7 @@ def main():
     ax.legend(loc="upper right", frameon=True)
 
     update()
-    plt.show()
+    window.show(args, __spec__.name)
 
 
 if __name__ == "__main__":

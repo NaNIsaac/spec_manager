@@ -16,10 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `splotter.command.ScanCommand` parses a `#S` command in the forms of the standard SPEC macros:
   `ascan`, `a2scan`, `a3scan`, `dscan`/`lup`, `d2scan`, `d3scan`, `th2th`, `mesh`, `dmesh`,
   `hscan`/`kscan`/`lscan`, `hklscan` and `hklmesh`. Other commands are kept with no axes.
-  The command-line tools are unchanged.
 - `timescan [count [sleep]]` and `loopscan points count [sleep]` are known commands too, with
   `Time` as their axis (`Space.TIME`) and the sleep time in `ScanCommand.sleep`. A timescan has no
   planned number of points. A file whose time scan has no `Time` column gives it no axes.
+
+### Changed
+
+- The plot windows of `mesh`, `probe`, `rock`, `gamdel` and `fwhm` open in a detached process,
+  so the command returns and the terminal stays free; closing the terminal leaves the window open.
+  Errors in the arguments are still reported in the terminal. `--wait` keeps the window in the
+  terminal as before, and `--save` opens no window.
 
 ## [0.1.4] - 2026-11-03
 
