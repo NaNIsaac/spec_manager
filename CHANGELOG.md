@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `ascan`, `a2scan`, `a3scan`, `dscan`/`lup`, `d2scan`, `d3scan`, `th2th`, `mesh`, `dmesh`,
   `hscan`/`kscan`/`lscan`, `hklscan` and `hklmesh`. Other commands are kept with no axes.
   The command-line tools are unchanged.
+- `timescan [count [sleep]]` and `loopscan points count [sleep]` are known commands too, with
+  `Time` as their axis (`Space.TIME`) and the sleep time in `ScanCommand.sleep`. A timescan has no
+  planned number of points. A file whose time scan has no `Time` column gives it no axes.
 
 ## [0.1.4] - 2026-11-03
 
