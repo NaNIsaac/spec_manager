@@ -1,11 +1,12 @@
 import argparse
+import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
-from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
@@ -163,7 +164,13 @@ class SpecScan:
             if kept:
                 arrays.append(array.reshape(kept, n_columns))
         self.skipped_lines += skipped
-        self._arrays = (self._arrays or []) + arrays
+        rows = self._data_value
+        if rows:
+            # rows already made into lists, as by a scan that grew after they were read
+            rows.extend(row for array in arrays for row in array.tolist())
+            self._rows_from_file = True
+        else:
+            self._arrays = (self._arrays or []) + arrays
 
     @property
     def motors(self) -> dict[str, float]:
@@ -321,39 +328,166 @@ class SpecScan:
             return None
 
 
+@dataclass(frozen=True, eq=False)
+class ScanStarted:
+    scan: SpecScan
+
+
+@dataclass(frozen=True, eq=False)
+class PointsAdded:
+    scan: SpecScan
+    lines: int  # data lines, before they are checked against the #L columns
+
+
+@dataclass(frozen=True, eq=False)
+class ScanEnded:
+    """reason: "next scan", "aborted" (a #C comment), "complete" (the planned points), or
+    "new session" (a header written by a restarted SPEC)."""
+
+    scan: SpecScan
+    reason: str
+
+
+@dataclass(frozen=True, eq=False)
+class FileReread:
+    """The file was replaced or cut short, so it was read again from the start: every scan is new."""
+
+
+Event = ScanStarted | PointsAdded | ScanEnded | FileReread
+
+# a stat that shows no change is trusted this long; a network share may report a stale size
+CHECK_SECONDS = 10.0
+# bytes compared at the start of the file and before the read offset, to notice a replaced file
+WINDOW = 4096
+
+
 class Spec:
+    """A SPEC file, read once by `with Spec(path) as spec`, and then by refresh() as it grows.
+
+    The file is opened for each read and closed again, so that the program writing it, or a copy
+    job, can rename or replace it in the meantime.
+    """
+
     def __init__(self, file: str | Path):
+        self.filepath = Path(file)
+        self._reset()
+        self._seen: tuple[int, int] | None = None  # size and mtime of the last stat
+        self._checked = 0.0
+
+    def _reset(self) -> None:
         self.file_metadata: dict[str, Any] = {}
         self.motor_names: list[str] = []
         self.scans: dict[int, SpecScan] = {}  # the last scan of each number
         self.all_scans: list[SpecScan] = []  # every scan, in file order
-        self._file: TextIOWrapper | None = None
-        self.filepath = Path(file)
+        # motor names, motor mnemonics, counter names, counter mnemonics of the current session
+        self._rows: dict[str, list[str]] = {"O": self.motor_names, "o": [], "J": [], "j": []}
+        self._scan: SpecScan | None = None  # the scan the next lines belong to
+        self._ended = False  # whether ScanEnded was given for it
+        self._data_lines: list[str] = []
+        self._width = 0  # the #L width the data lines of the open scan fall under
+        self._offset = 0  # bytes read, up to the end of the last complete line
+        self._head = self._tail = b""
+        # a last line without its newline, which `with Spec` reads as a line
+        self._fed_partial = b""
 
     def __enter__(self):
-        self._file = open(self.filepath, encoding="utf-8", errors="replace")
-        self._parse(self._file)
+        self._read(final=True)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._file:
-            self._file.close()
+        pass
 
-    def _parse(self, file: TextIOWrapper):
-        current_scan = None
-        # motor names, motor mnemonics, counter names, counter mnemonics of the current session
-        rows: dict[str, list[str]] = {"O": self.motor_names, "o": [], "J": [], "j": []}
-        data_lines: list[str] = []
+    def refresh(self) -> list[Event]:
+        """What the file gained since the last read, as events. Only complete lines are read; a
+        line SPEC is still writing waits for its newline."""
+        try:
+            stat = os.stat(self.filepath)
+            unchanged = (stat.st_size, stat.st_mtime_ns) == self._seen
+            if unchanged and time.monotonic() - self._checked < CHECK_SECONDS:
+                return []
+            return self._read(final=False)
+        except FileNotFoundError:
+            return []  # being replaced; the next refresh reads the new file
+
+    def _read(self, final: bool) -> list[Event]:
+        events: list[Event] = []
+        stat = os.stat(self.filepath)
+        with open(self.filepath, "rb") as file:
+            # the size through the open file, not the stat a share may have cached
+            size = file.seek(0, os.SEEK_END)
+            if self._offset and not self._same_file(file, size):
+                self._reset()
+                events.append(FileReread())
+            self._seen, self._checked = (stat.st_size, stat.st_mtime_ns), time.monotonic()
+            if self._fed_partial:
+                return events
+            file.seek(self._offset)
+            new = file.read()
+        end = new.rfind(b"\n") + 1
+        complete, partial = new[:end], new[end:] if final else b""
+        if not complete and not partial:
+            return events
+        if len(self._head) < WINDOW:
+            self._head = (self._head + complete)[:WINDOW]
+        self._tail = (self._tail + complete[-WINDOW:])[-WINDOW:]
+        self._offset += len(complete)
+        self._fed_partial = partial
+        text = (complete + partial).decode("utf-8", errors="replace")
+        if "\r" in text:
+            # as a file opened in text mode reads it
+            text = text.replace("\r\n", "\n").replace("\r", "\n")
+        events += self._feed(text)
+        return events
+
+    def _same_file(self, file, size: int) -> bool:
+        """Whether the file still begins and continues as it did; a last line read without its
+        newline must not have changed either, as it was taken as a whole line."""
+        if size < self._offset + len(self._fed_partial):
+            return False
+        file.seek(0)
+        if file.read(len(self._head)) != self._head:
+            return False
+        file.seek(self._offset - len(self._tail))
+        if file.read(len(self._tail)) != self._tail:
+            return False
+        if self._fed_partial:
+            return size == self._offset + len(self._fed_partial) and (
+                file.read(len(self._fed_partial)) == self._fed_partial
+            )
+        return True
+
+    def _feed(self, text: str) -> list[Event]:
+        events: list[Event] = []
+        rows = self._rows
+        current_scan, ended, width = self._scan, self._ended, self._width
+        data_lines, added = self._data_lines, 0
+        if current_scan is not None:
+            # the open scan grows: what was read from it before is read again
+            current_scan.__dict__.pop("_frame", None)
+            current_scan._uxml_dict = None
+            if current_scan._lines is None:
+                data_lines = []
+                current_scan._lines = [(width, data_lines)]
+
+        def close(reason: str | None) -> None:
+            nonlocal added, ended
+            if added:
+                events.append(PointsAdded(current_scan, added))
+                added = 0
+            if reason and not ended:
+                events.append(ScanEnded(current_scan, reason))
+                ended = True
 
         # The lines of a scan, most of them data and #UXML, take the first branches: a file holds
         # close to a million lines, and each test on every line costs a share of the parse time.
-        for line in file.read().split("\n"):
+        for line in text.split("\n"):
             line = line.strip()
             if not line:
                 continue
             if line[0] != "#":
                 if current_scan is not None:
                     data_lines.append(line)
+                    added += 1
                 elif not self.all_scans:
                     tag = line.split(" ", 1)[0]
                     self.file_metadata[tag] = line[len(tag) :].strip()
@@ -371,20 +505,25 @@ class Spec:
                     current_scan.columns = split_names(
                         line[3:], int(declared) if declared.isdigit() else None
                     )
-                    data_lines = []
-                    current_scan._lines.append((len(current_scan.columns), data_lines))
+                    width, data_lines = len(current_scan.columns), []
+                    current_scan._lines.append((width, data_lines))
                 elif second == "P" and line[2:3].isdigit():
                     current_scan._raw_p_values.extend(
                         [float(x) for x in line[line.find(" ") + 1 :].split()]
                     )
                 else:
                     tag = line.split(" ", 1)[0]
-                    current_scan.metadata[tag] = line[len(tag) :].strip()
+                    value = line[len(tag) :].strip()
+                    current_scan.metadata[tag] = value
+                    if tag == "#C" and "Scan aborted" in value:
+                        close("aborted")
                 continue
             if line.startswith("#S "):
                 parts = line.split(maxsplit=2)
                 scan_no = int(parts[1])
                 command = parts[2] if len(parts) > 2 else ""
+                if current_scan is not None:
+                    close("next scan")
 
                 current_scan = SpecScan(
                     scan_no=scan_no,
@@ -396,13 +535,16 @@ class Spec:
                 )
                 self.scans[scan_no] = current_scan
                 self.all_scans.append(current_scan)
-                data_lines = []
+                width, data_lines, ended = 0, [], False
                 current_scan._lines = [(0, data_lines)]
+                events.append(ScanStarted(current_scan))
                 continue
 
             # a restarted SPEC session writes a new file header between two scans
             header_row = HEADER_ROW.match(line)
             if line.startswith(("#F ", "#E ")) or header_row:
+                if current_scan is not None:
+                    close("new session")
                 current_scan = None
             if line.startswith(("#F ", "#E ")):
                 # a new session may lack a row the old one had; it must not inherit that row
@@ -415,12 +557,12 @@ class Spec:
                     kind, number = header_row.groups()
                     if number == "0" and rows[kind]:
                         rows[kind] = []
-                    text = line[header_row.end() :]
+                    value = line[header_row.end() :]
                     # names may hold one space (Sample X); mnemonics never do
-                    rows[kind].extend(split_names(text) if kind in "OJ" else text.split())
+                    rows[kind].extend(split_names(value) if kind in "OJ" else value.split())
                     if kind != "O" and not self.all_scans:
                         tag = line.split(" ", 1)[0]
-                        self.file_metadata[tag] = text.strip()
+                        self.file_metadata[tag] = value.strip()
                 elif not self.all_scans:
                     tag = line.split(" ", 1)[0]
                     self.file_metadata[tag] = line[len(tag) :].strip()
@@ -429,12 +571,22 @@ class Spec:
                 tag = line.split(" ", 1)[0]
                 current_scan.metadata[tag] = line[len(tag) :].strip()
 
+        if current_scan is not None:
+            planned = current_scan.scan_command.points
+            close("complete" if planned and len(current_scan.data) >= planned else None)
+        self._scan, self._ended, self._width = current_scan, ended, width
+        self._data_lines = data_lines
+        if any(isinstance(event, ScanStarted) for event in events):
+            self._label_scans()
+        return events
+
+    def _label_scans(self) -> None:
         numbers = Counter(scan.scan_no for scan in self.all_scans)
         seen: Counter[int] = Counter()
         for scan in self.all_scans:
             seen[scan.scan_no] += 1
-            if numbers[scan.scan_no] > 1:
-                scan.label = f"{scan.scan_no}.{seen[scan.scan_no]}"
+            repeated = numbers[scan.scan_no] > 1
+            scan.label = f"{scan.scan_no}.{seen[scan.scan_no]}" if repeated else str(scan.scan_no)
 
     def get_scan(self, run: int | str) -> SpecScan:
         """The scan of a run number, the last one if a restart reused it; "12.1" is the first 12."""
