@@ -21,7 +21,7 @@ from splotter.mesh_map import (
     style_colorbar,
 )
 from splotter.scan_info import point_time, point_values, value_grid
-from splotter.spec import SpecScan, find_name
+from splotter.spec import SpecScan
 
 HOVER_COLOR, PIN_COLOR = "#e8e8e8", "#6fc7d6"
 HINT = "hover over a cell\nfor its values,\nclick to keep it"
@@ -70,7 +70,10 @@ class Probe:
         motors, counters = point_values(self.scan.motors, self.df, point)
         everything = {**motors, **counters}
         asked = [*(self.show or [])]
-        found = {name: find_name(name, everything) for name in [self.x, self.y, *asked]}
+        found = {
+            name: self.scan.column(name) or self.scan.motor(name)
+            for name in [self.x, self.y, *asked]
+        }
         missing = [name for name, key in found.items() if key is None]
         if missing:
             raise SystemExit(
@@ -244,12 +247,14 @@ def main() -> None:
         "--show",
         nargs="+",
         metavar="NAME",
-        help="counters and motors in the panel (default: every counter)",
+        help="counters and motors in the panel, names or mnemonics (default: every counter)",
     )
     window.add_arguments(parser)
     args = parser.parse_args()
 
-    scans, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
+    scans, maps, args.counter, args.x, args.y = load_maps(
+        args.spec_file, args.scans, args.counter, args.x, args.y
+    )
     _fig, _panel = draw(scans, maps, args)
     window.show(args, __spec__.name, prints=True)
 

@@ -77,7 +77,10 @@ def test_every_command_runs_on_it(tmp_path, demo, monkeypatch, capsys):
     scan_list = tmp_path / "demo_fwhm.csv"
     out = tmp_path / "fwhm.png"
     run(monkeypatch, "fwhm", demo, scan_list, "--energy", 8, "--counter", "imroi3", "--save", out)
-    assert all((tmp_path / name).exists() for name in ("mesh.png", "rock.png", "fwhm.png"))
+    fit = ["--energy", 8, "--counter", "imroi3", "--save", tmp_path / "fwhm_scans.png"]
+    run(monkeypatch, "fwhm", demo, "--scans", 6, 7, 8, *fit)
+    names = ("mesh.png", "rock.png", "fwhm.png", "fwhm_scans.png")
+    assert all((tmp_path / name).exists() for name in names)
 
 
 def test_the_command_keeps_existing_files(tmp_path, monkeypatch, capsys):

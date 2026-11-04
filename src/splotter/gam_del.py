@@ -7,7 +7,7 @@ import pandas as pd
 from matplotlib.widgets import Slider, TextBox
 
 from splotter import window
-from splotter.spec import Spec, run_id, scan_or_exit
+from splotter.spec import Spec, SpecScan, run_id, scan_or_exit
 
 
 def calculate_theory_delta(gamma_array, tth):
@@ -18,16 +18,36 @@ def calculate_theory_delta(gamma_array, tth):
     return np.degrees(np.arccos(cos_val))
 
 
-def load_run_data(sp: Spec, run_ns: list[int]) -> pd.DataFrame:
-    """Gamma and Delta of the given runs as a DataFrame, in the order of run_ns."""
+def detector_angles(scan: SpecScan, gamma: str, delta: str) -> tuple[float, float]:
+    """Gamma and delta at the start of the scan (#P), from motors named or given by mnemonic."""
+    found = {name: scan.motor(name) for name in (gamma, delta)}
+    missing = [name for name, motor in found.items() if motor is None]
+    if missing:
+        raise SystemExit(
+            f"scan {scan.label} has no motor '{missing[0]}'; "
+            "splotter info FILE RUN --names lists what it has"
+        )
+    return scan.motors[found[gamma]], scan.motors[found[delta]]
+
+
+def load_run_data(
+    sp: Spec, run_ns: list[str], gamma: str = "Gamma", delta: str = "Delta"
+) -> pd.DataFrame:
+    """Gamma and delta of the given runs as a DataFrame, in the order of run_ns."""
     data = []
     for run_n in run_ns:
-        scan = scan_or_exit(sp, run_n)
-        gamma = scan.motors.get("Gamma", np.nan)
-        delta = scan.motors.get("Delta", np.nan)
-        data.append({"run_n": run_n, "gamma": gamma, "delta": delta})
+        g, d = detector_angles(scan_or_exit(sp, run_n), gamma, delta)
+        data.append({"run_n": run_n, "gamma": g, "delta": d})
+    return pd.DataFrame(data)
 
-    return pd.DataFrame(data).dropna()
+
+def add_angle_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--gamma", default="Gamma", help="detector motor of gamma, name or mnemonic"
+    )
+    parser.add_argument(
+        "--delta", default="Delta", help="detector motor of delta, name or mnemonic"
+    )
 
 
 def main():
@@ -38,12 +58,13 @@ def main():
     parser.add_argument(
         "runs", type=run_id, nargs="+", help="run numbers, plotted in the given order"
     )
+    add_angle_arguments(parser)
     window.add_arguments(parser)
     args = parser.parse_args()
     spec_file, run_ns = args.spec_file, args.runs
 
     with Spec(spec_file) as sp:
-        df = load_run_data(sp, run_ns)
+        df = load_run_data(sp, run_ns, args.gamma, args.delta)
     gamma_data = df["gamma"].values
     delta_data = df["delta"].values
 

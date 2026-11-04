@@ -16,7 +16,7 @@ from splotter.command import ScanCommand, Space
 from splotter.names import Names, name_key
 from splotter.names import find as find_name
 
-__all__ = ["Spec", "SpecScan", "find_name", "name_key", "run_id", "scan_or_exit"]
+__all__ = ["Spec", "SpecScan", "curve_columns", "find_name", "name_key", "run_id", "scan_or_exit"]
 
 NAME_GAP = re.compile(r"\s{2,}|\t")
 
@@ -52,10 +52,9 @@ HEADER_ROW = re.compile(r"#([OoJj])(\d+)(?:\s|$)")
 
 
 def _xml_to_dict(element: ET.Element) -> Any:
-    # 1. Handle Leaf Nodes (No children)
+    """An element as nested dicts: a leaf as int, float or text, a repeated tag as a list."""
     if len(element) == 0:
         val = element.text.strip() if element.text else ""
-        # Auto-casting logic
         if val.isdigit():
             return int(val)
         try:
@@ -63,10 +62,8 @@ def _xml_to_dict(element: ET.Element) -> Any:
         except ValueError:
             return val
 
-    # 2. Handle Nested Nodes
     result = {}
-    # Capture attributes only for parent nodes if necessary,
-    # but for your SPEC file, usually 'number' is the only useful one.
+    # a parent's attributes, such as number="1", sit among its children
     if element.attrib:
         result.update(element.attrib)
 
@@ -167,6 +164,16 @@ class SpecScan:
             found.append(name)
         return tuple(found)
 
+    def column(self, key: str) -> str | None:
+        """The #L column meant by a name or a mnemonic (#o for motors, #j for counters)."""
+        return self.motor_table.resolve(key, self.columns) or self.counter_table.resolve(
+            key, self.columns
+        )
+
+    def motor(self, key: str) -> str | None:
+        """The motor of #O and #P meant by a name or a mnemonic."""
+        return self.motor_table.resolve(key, self.motors)
+
     def __getitem__(self, key: str) -> np.ndarray | float:
         """A data column as an array, else a motor's start position (#P); by name or mnemonic.
 
@@ -228,9 +235,8 @@ class SpecScan:
 
     @property
     def sdd_from_uxml(self) -> float | None:
-        """UXML에서 sample_detector_distance를 직접 추출하는 헬퍼"""
+        """sample_detector_distance of the ad_detector element of #UXML, if there is one."""
         try:
-            # ad_detector -> sample_detector_distance 경로 탐색
             return float(self.uxml.get("ad_detector", {}).get("sample_detector_distance", None))
         except (TypeError, ValueError):
             return None
@@ -306,7 +312,6 @@ class Spec:
                     self.file_metadata[tag] = line[len(tag) :].strip()
             else:
                 if line.startswith("#D "):
-                    # line[3:]을 통해 '#D '를 제거하고 파싱
                     current_scan.time = datetime.strptime(line[3:], "%a %b %d %H:%M:%S %Y")
                 elif line.startswith("#L "):
                     declared = current_scan.metadata.get("#N", "")
@@ -354,6 +359,21 @@ def run_id(text: str) -> str:
     if not re.fullmatch(r"\d+(\.\d+)?", text):
         raise argparse.ArgumentTypeError(f"'{text}' is not a run number")
     return text
+
+
+def curve_columns(scan: SpecScan, counter: str) -> tuple[str, str]:
+    """The #L columns of a curve: what the command scanned first, and the counter.
+
+    A command that is not known is taken to scan its first column, as the standard macros write it.
+    """
+    if not scan.data:
+        raise SystemExit(f"scan {scan.label} has no data")
+    column = scan.column(counter)
+    if column is None:
+        raise SystemExit(
+            f"scan {scan.label} has no counter '{counter}'; columns: {', '.join(scan.columns)}"
+        )
+    return (scan.axes[0] if scan.axes else scan.columns[0]), column
 
 
 def scan_or_exit(spec: Spec, run: int | str) -> SpecScan:

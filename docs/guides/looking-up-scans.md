@@ -71,7 +71,8 @@ point
 | `--names` | The names `-c` accepts for this scan |
 
 Names match without regard to case, spaces and underscores, so `sample_x` finds `Sample_X` and the
-`Sample X` of older files.
+`Sample X` of older files. A mnemonic as typed in SPEC, `sx`, finds `Sample_X` where the file has
+`#o` and `#j` rows.
 
 A motor that stays put gives one row, as its value would only repeat:
 
