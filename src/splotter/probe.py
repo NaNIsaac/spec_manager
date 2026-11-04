@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
+from splotter import window
 from splotter.mesh_map import (
     COLORBAR_AND_LABELS,
     LEGEND_STYLE,
@@ -245,11 +246,12 @@ def main() -> None:
         metavar="NAME",
         help="counters and motors in the panel (default: every counter)",
     )
+    window.add_arguments(parser)
     args = parser.parse_args()
 
     scans, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
     _fig, _panel = draw(scans, maps, args)
-    plt.show()
+    window.show(args, __spec__.name, prints=True)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from matplotlib.patheffects import Normal, Stroke
 from matplotlib.ticker import AutoMinorLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+from splotter import window
 from splotter.spec import Spec, SpecScan, find_name, name_key, run_id, scan_or_exit
 
 plt.rcParams["font.weight"] = "bold"
@@ -285,6 +286,7 @@ def main() -> None:
     )
     add_map_arguments(parser)
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
+    window.add_arguments(parser)
     args = parser.parse_args()
 
     _, maps = load_maps(args.spec_file, args.scans, args.counter, args.x, args.y)
@@ -307,7 +309,7 @@ def main() -> None:
     if args.save:
         fig.savefig(args.save, dpi=300, bbox_inches="tight")
     else:
-        plt.show()
+        window.show(args, __spec__.name)
 
 
 if __name__ == "__main__":
