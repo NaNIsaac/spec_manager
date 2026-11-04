@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   mnemonic.
 - `splotter fwhm --scans RUN ...`: a series without a scan list, with gamma and delta from `#P`;
   `--gamma` and `--delta` name those motors in `fwhm` and `gamdel`.
+- `benchmarks/parse_speed.py` times the parser on a generated 60 MB log, against a release with
+  `--against 0.1.4`; the README has its numbers.
 
 ### Changed
 
