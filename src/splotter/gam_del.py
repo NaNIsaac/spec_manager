@@ -50,16 +50,22 @@ def add_angle_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Measured gamma/delta of runs against the theoretical arc of one 2theta."
+        prog="splotter gamdel",
+        description="Measured gamma/delta of runs against the theoretical arc of one 2theta.",
     )
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
     parser.add_argument(
         "runs", type=run_id, nargs="+", help="run numbers, plotted in the given order"
     )
     add_angle_arguments(parser)
     window.add_arguments(parser)
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     spec_file, run_ns = args.spec_file, args.runs
 

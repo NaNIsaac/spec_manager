@@ -13,12 +13,13 @@ plt.rcParams["axes.labelweight"] = "bold"
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="splotter rock",
         description="Normalized rocking curves of SPEC scans, log scale: the counter against what "
-        "the command scanned, or against the first column for a command not known."
+        "the command scanned, or against the first column for a command not known.",
     )
-    parser.add_argument("spec_file", type=Path)
+    parser.add_argument("spec_file", type=Path, help="the SPEC file to read")
     parser.add_argument("scans", type=run_id, nargs="+")
     parser.add_argument(
         "--labels", nargs="+", help="one legend label per scan (default: scan number)"
@@ -26,6 +27,11 @@ def main() -> None:
     parser.add_argument("--counter", default="imroi1", help="name or mnemonic")
     parser.add_argument("--save", type=Path, help="write the figure here instead of showing it")
     window.add_arguments(parser)
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     labels = args.labels or [str(n) for n in args.scans]
 

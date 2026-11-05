@@ -151,6 +151,7 @@ scan. `scan.scan_command` parses the `#S` command of the standard SPEC scan macr
 - [Mesh maps](docs/guides/mesh-maps.md): combining scans and what the hatching means.
 - [Rocking curves and peak widths](docs/guides/rocking-and-widths.md).
 - [SPEC files across the years](docs/guides/spec-formats.md): what the parser handles, and its limits.
+- [Command-line reference](docs/reference/cli.md): every command and option.
 - [Changelog](CHANGELOG.md) and [citation](CITATION.cff).
 
 ## Performance

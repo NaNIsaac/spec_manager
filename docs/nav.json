@@ -18,6 +18,12 @@
         { "text": "Figure reproduction", "link": "media/README.md" },
         { "text": "Changelog", "link": "https://github.com/NaNIsaac/splotter/blob/main/CHANGELOG.md" }
       ]
+    },
+    {
+      "text": "Reference",
+      "items": [
+        { "text": "Command line", "link": "reference/cli.md" }
+      ]
     }
   ]
 }

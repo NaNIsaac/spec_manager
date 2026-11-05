@@ -18,6 +18,8 @@ Start with [installation](install.md) and the [tutorial](tutorial.md). Then:
 - [Rocking curves and peak widths](guides/rocking-and-widths.md)
 - [SPEC files across the years](guides/spec-formats.md)
 
+Every command and option is listed in the [command-line reference](reference/cli.md).
+
 See the [changelog](https://github.com/NaNIsaac/splotter/blob/main/CHANGELOG.md),
 [citation](https://github.com/NaNIsaac/splotter/blob/main/CITATION.cff) and
 [figure reproduction](media/README.md).
