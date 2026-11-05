@@ -12,6 +12,7 @@ COMMANDS = {
     "rock": ("splotter.rocking_curve", "normalized rocking curves on a log scale"),
     "gamdel": ("splotter.gam_del", "measured gamma/delta against the arc of one 2theta"),
     "fwhm": ("splotter.fwhm_vs_q", "Gaussian FWHM of rocking scans against Q"),
+    "shell": ("splotter.shell", "read the file once and query it at a prompt; tail follows it"),
     "demo": ("splotter.demo", "write a made-up SPEC file to try the commands on"),
 }
 

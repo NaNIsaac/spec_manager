@@ -10,6 +10,7 @@
 | [`splotter rock`](#splotter-rock) | Normalized rocking curves of SPEC scans, log scale: the counter against what the command scanned, or against the first column for a command not known. |
 | [`splotter gamdel`](#splotter-gamdel) | Measured gamma/delta of runs against the theoretical arc of one 2theta. |
 | [`splotter fwhm`](#splotter-fwhm) | Gaussian FWHM of rocking scans vs Q: one series per scan-list CSV and one per --scans, whose gamma and delta are read from the file. |
+| [`splotter shell`](#splotter-shell) | Read a SPEC file once and query it at a prompt: ls, show, wa, pa, the plot commands, and tail to follow the file as it grows. |
 | [`splotter demo`](#splotter-demo) | Write a made-up SPEC file to try the commands on; nothing in it is measured. |
 
 ## splotter info
@@ -180,6 +181,20 @@ usage: splotter fwhm [-h] [--scans RUN [RUN ...]] [--labels LABELS [LABELS ...]]
 | `--delta DELTA` | detector motor of delta, name or mnemonic |
 | `--save SAVE` | write the figure here instead of showing it |
 | `--wait` | keep the window in this terminal until it is closed (default: return at once) |
+
+## splotter shell
+
+Read a SPEC file once and query it at a prompt: ls, show, wa, pa, the plot commands, and tail to follow the file as it grows.
+
+```
+usage: splotter shell [-h] spec_file
+```
+
+### Positional arguments
+
+| Argument | Description |
+|---|---|
+| `spec_file` | the SPEC file to read |
 
 ## splotter demo
 

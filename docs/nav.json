@@ -12,6 +12,7 @@
       "text": "Guides",
       "items": [
         { "text": "Looking up scans", "link": "guides/looking-up-scans.md" },
+        { "text": "The shell and a growing file", "link": "guides/shell.md" },
         { "text": "Mesh maps", "link": "guides/mesh-maps.md" },
         { "text": "Rocking curves and peak widths", "link": "guides/rocking-and-widths.md" },
         { "text": "SPEC files across the years", "link": "guides/spec-formats.md" },

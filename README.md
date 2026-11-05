@@ -75,6 +75,7 @@ options.
 | `gamdel` | Measured detector angles gamma and delta against the arc of one 2θ |
 | `mesh` | Map of a counter over two motors, from one mesh or several mesh and line scans |
 | `probe` | The `mesh` map in a window that lists the values of the cell under the pointer |
+| `shell` | A prompt that reads the file once for many lookups and plots, and can follow it as it grows |
 | `demo` | A made-up SPEC file to try the commands on |
 
 Motors and counters are taken by name (`Sample_X`) or by the mnemonic the file records (`sx`) in
@@ -97,6 +98,9 @@ splotter info FILE --meta                  # the file header
 ```
 
 `--csv` writes the `-c` table comma-separated, for a spreadsheet or another program.
+
+`splotter shell FILE` reads a long file once and answers `ls`, `show`, `wa`, `pa` and the plot
+commands at a prompt; `tail on` lists the scans SPEC starts and ends while it writes the file.
 
 ### Plots
 
@@ -148,6 +152,7 @@ scan. `scan.scan_command` parses the `#S` command of the standard SPEC scan macr
 
 - [Overview](docs/index.md), [installation](docs/install.md) and [tutorial](docs/tutorial.md).
 - [Looking up scans](docs/guides/looking-up-scans.md): the scan list, points, column names, metadata.
+- [The shell and a growing file](docs/guides/shell.md): lookups at a prompt, following a file SPEC writes.
 - [Mesh maps](docs/guides/mesh-maps.md): combining scans and what the hatching means.
 - [Rocking curves and peak widths](docs/guides/rocking-and-widths.md).
 - [SPEC files across the years](docs/guides/spec-formats.md): what the parser handles, and its limits.

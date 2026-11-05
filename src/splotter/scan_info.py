@@ -127,6 +127,25 @@ def print_scan_list(scans: list[SpecScan]) -> None:
         )
 
 
+def print_scan_header(scan: SpecScan, df: pd.DataFrame) -> None:
+    print(f"Scan {scan.label}: {scan.command}")
+    print(f"Started: {scan.time}")
+    print(f"Last point: {point_time(scan, df, -1) or '-'}")
+    print(f"Points: {len(df)}")
+
+
+def print_scan_summary(scan: SpecScan, df: pd.DataFrame) -> None:
+    """Motors at the start, and the range of each counter with the point of its maximum."""
+    print(f"\nMotors at the start of the scan:\n{value_grid(scan.motors)}")
+    if not df.empty:
+        summary = df.drop(columns=[c for c in df.columns if c in scan.motors]).agg(
+            ["min", "max", "mean"]
+        )
+        summary = summary.T.assign(max_point=df.idxmax(numeric_only=True))
+        summary = summary.astype(object).map(lambda value: f"{value:.6g}")
+        print(f"\nCounters over the scan:\n{summary.to_string(line_width=None)}")
+
+
 def print_scan_metadata(scan: SpecScan) -> None:
     print("\nHeader lines:")
     for tag, text in scan.metadata.items():
@@ -229,22 +248,11 @@ def main() -> None:
         print_table(table, args.csv)
         return
 
-    print(f"Scan {scan.label}: {scan.command}")
-    print(f"Started: {scan.time}")
-    print(f"Last point: {point_time(scan, df, -1) or '-'}")
-    print(f"Points: {len(df)}")
-
+    print_scan_header(scan, df)
     if args.meta:
         print_scan_metadata(scan)
     elif args.point is None:
-        print(f"\nMotors at the start of the scan:\n{value_grid(scan.motors)}")
-        if not df.empty:
-            summary = df.drop(columns=[c for c in df.columns if c in scan.motors]).agg(
-                ["min", "max", "mean"]
-            )
-            summary = summary.T.assign(max_point=df.idxmax(numeric_only=True))
-            summary = summary.astype(object).map(lambda value: f"{value:.6g}")
-            print(f"\nCounters over the scan:\n{summary.to_string(line_width=None)}")
+        print_scan_summary(scan, df)
     else:
         motors, counters = point_values(scan.motors, df, args.point)
         print(f"\nTime at point {args.point}: {point_time(scan, df, args.point) or '-'}")
